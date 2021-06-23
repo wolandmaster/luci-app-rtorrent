@@ -1,12 +1,12 @@
 -- Copyright 2003-2010 Kepler Project
--- Copyright 2014-2018 Sandor Balazsi <sandor.balazsi@gmail.com>
+-- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- XML-RPC over SCGI.
 
 local error, tonumber, tostring, unpack = error, tonumber, tostring, unpack
 
-local socket= require"socket"
-local string= require"string"
-local xmlrpc= require"xmlrpc"
+local socket = require "socket"
+local string = require "string"
+local xmlrpc = require "xmlrpc"
 
 module("xmlrpc.scgi")
 
@@ -73,4 +73,3 @@ function receive(sock)
 	local code = socket.skip(2, string.find(headers["status"], "^(%d%d%d)"))
 	return err, code, headers, body
 end
-

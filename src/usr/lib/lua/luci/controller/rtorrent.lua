@@ -1,35 +1,45 @@
--- Copyright 2014-2018 Sandor Balazsi <sandor.balazsi@gmail.com>
+-- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- Licensed to the public under the GNU General Public License.
 
-local nixio = require "nixio"
 local dm = require "luci.model.cbi.rtorrent.download"
 
 module("luci.controller.rtorrent", package.seeall)
 
 function index()
-	entry({"admin", "rtorrent"},  firstchild(), "Torrent", 45).dependent = false
-	entry({"admin", "rtorrent", "main"}, cbi("rtorrent/main"), "Torrent List", 10).leaf = true
-	entry({"admin", "rtorrent", "add"}, cbi("rtorrent/add", {autoapply=true}), "Add Torrent", 20)
-	entry({"admin", "rtorrent", "rss"}, arcombine(cbi("rtorrent/rss"), cbi("rtorrent/rss-rule")), "RSS Downloader", 30).leaf = true
-	entry({"admin", "rtorrent", "admin"}, cbi("rtorrent/admin/rtorrent"), "Admin", 40)
+	entry({ "admin", "rtorrent" },  firstchild(), "Torrent", 70)
+	entry({ "admin", "rtorrent", "main" },
+		form("rtorrent/main"), "List", 10).leaf = true
+	entry({ "admin", "rtorrent", "add" },
+		form("rtorrent/add", { autoapply = true }), "Add", 20)
+	entry({ "admin", "rtorrent", "rss" }, arcombine(
+		cbi("rtorrent/rss"), cbi("rtorrent/rss-rule")), "RSS Downloader", 30).leaf = true
+	entry({ "admin", "rtorrent", "settings" },
+		alias("admin", "rtorrent", "settings", "rtorrent"), "Settings", 40)
 
-	entry({"admin", "rtorrent", "info"}, cbi("rtorrent/torrent/info"), nil).leaf = true
-	entry({"admin", "rtorrent", "files"}, cbi("rtorrent/torrent/files"), nil).leaf = true
-	entry({"admin", "rtorrent", "trackers"}, cbi("rtorrent/torrent/trackers"), nil).leaf = true
-	entry({"admin", "rtorrent", "peers"}, cbi("rtorrent/torrent/peers"), nil).leaf = true
+	-- torrent
+	entry({ "admin", "rtorrent", "torrent", "info" },
+		form("rtorrent/torrent/info"), "Info", 10).leaf = true
+	entry({ "admin", "rtorrent", "torrent", "files" },
+		form("rtorrent/torrent/files"), "Files", 20).leaf = true
+	entry({ "admin", "rtorrent", "torrent", "trackers" },
+		form("rtorrent/torrent/trackers"), "Trackers", 30).leaf = true
+	entry({ "admin", "rtorrent", "torrent", "peers" },
+		form("rtorrent/torrent/peers"), "Peers", 40).leaf = true
+	entry({ "admin", "rtorrent", "torrent", "chunks" },
+		form("rtorrent/torrent/chunks"), "Chunks", 50).leaf = true
 
-	entry({"admin", "rtorrent", "download"}, call("download"), nil).leaf = true
-	entry({"admin", "rtorrent", "downloadall"}, call("downloadall"), nil).leaf = true
+	-- settings
+	entry({ "admin", "rtorrent", "settings", "rtorrent" },
+		form("rtorrent/settings/rtorrent"), "rTorrent", 10)
+	entry({ "admin", "rtorrent", "settings", "frontend" },
+		cbi("rtorrent/settings/frontend"), "rTorrent Frontend", 20)
+	entry({ "admin", "rtorrent", "settings", "rss" },
+		cbi("rtorrent/settings/rss"), "RSS Downloader", 30)
 
-	entry({"admin", "rtorrent", "admin", "rtorrent"}, cbi("rtorrent/admin/rtorrent"), nil).leaf = true
-	entry({"admin", "rtorrent", "admin", "rss"}, cbi("rtorrent/admin/rss"), nil).leaf = true
+	-- download
+	entry({ "admin", "rtorrent", "download" }, call("download")).leaf = true
 end
 
 function download()
-	dm.download_file(nixio.bin.b64decode(luci.dispatcher.context.requestpath[4]))
+	dm.download(unpack(luci.dispatcher.context.requestpath, 4))
 end
-
-function downloadall()
-	dm.download_all(nixio.bin.b64decode(luci.dispatcher.context.requestpath[4]))
-end
-

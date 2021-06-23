@@ -32,7 +32,6 @@ packages-file: ipk
 	cp control/control ipk/Packages
 	echo "Filename: $(IPK)" >> ipk/Packages
 	du -b ipk/$(IPK) | awk '{print "Size:", $$1}' >> ipk/Packages
-	md5sum ipk/$(IPK) | awk '{print "MD5Sum:", $$1}' >> ipk/Packages
 	sha256sum ipk/$(IPK) | awk '{print "SHA256sum:", $$1}' >> ipk/Packages
 	usign -S -m ipk/Packages -s key/sign_key
 	gzip ipk/Packages
@@ -43,7 +42,6 @@ clean:
 test-deploy: test-remove
 	cp -a src/usr/* /usr
 	cp -a src/www/* /www
-	rm -fr /tmp/luci-indexcache /tmp/luci-modulecache
 
 test-remove:
 	find src/usr src/www -type f -o -type l | sed 's/^src//' | xargs rm -f
@@ -51,7 +49,7 @@ test-remove:
 	rm -fr /usr/lib/lua/luci/view/rtorrent
 	rm -fr /usr/lib/lua/xmlrpc
 	rm -fr /www/luci-static/resources/icons/filetypes
-	rm -fr /tmp/luci-indexcache /tmp/luci-modulecache
+	rm -fr /tmp/luci-indexcache* /tmp/luci-modulecache
 
 test-reinstall:
 	opkg list-installed | grep -q $(NAME) \

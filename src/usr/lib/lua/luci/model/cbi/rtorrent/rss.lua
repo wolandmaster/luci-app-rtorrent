@@ -1,39 +1,37 @@
--- Copyright 2014-2018 Sandor Balazsi <sandor.balazsi@gmail.com>
+-- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- Licensed to the public under the GNU General Public License.
 
-m = Map("rtorrent", "RSS Downloader")
+local build_url = require "luci.dispatcher".build_url
+local common = require "luci.model.cbi.rtorrent.common"
 
-s = m:section(TypedSection, "rss-rule")
-s.addremove = true
-s.anonymous = true
-s.sortable = true
-s.template = "cbi/tblsection"
-s.extedit = luci.dispatcher.build_url("admin/rtorrent/rss/%s")
-s.template_addremove = "rtorrent/rss_addrule"
+local map, rss_rule, name, match, enabled
 
-function s.parse(self, ...)
-	TypedSection.parse(self, ...)
+map = Map("rtorrent", "RSS Downloader", common.rss_downloader_status())
+map.template = "rtorrent/map"
 
-	local newrule_name = m:formvalue("_newrule.name")
-	local newrule_submit = m:formvalue("_newrule.submit")
-
-	if newrule_submit then
-		newrule = TypedSection.create(self, section)
-		self.map:set(newrule, "name", newrule_name)
-
-		m.uci:save("rtorrent")
-		luci.http.redirect(luci.dispatcher.build_url("admin/rtorrent/rss", newrule))
-	end
+rss_rule = map:section(TypedSection, "rss-rule")
+rss_rule.template = "rtorrent/tblsection"
+rss_rule.addremove = true
+rss_rule.anonymous = true
+rss_rule.sortable = true
+rss_rule.extedit = build_url("admin", "rtorrent", "rss", "%s")
+rss_rule.create = function(self, section)
+	local rule = TypedSection.create(self, section)
+	self.map:set(rule, "name", "Unnamed rule")
+	luci.http.redirect(build_url("admin", "rtorrent", "rss", rule))
 end
 
-name = s:option(DummyValue, "name", "Name")
-name.width = "30%"
+name = rss_rule:option(DummyValue, "name", "Name")
+name.width = "45%"
+name.classes = { "wrap" }
 
-match = s:option(DummyValue, "match", "Match")
-match.width = "60%"
+match = rss_rule:option(DummyValue, "match", "Match")
+match.width = "54%"
+match.classes = { "wrap" }
 
-enabled = s:option(Flag, "enabled", "Enabled")
+enabled = rss_rule:option(Flag, "enabled", "Enabled")
 enabled.rmempty = false
+enabled.width = "1%"
+enabled.classes = { "nowrap", "center" }
 
-return m
-
+return map

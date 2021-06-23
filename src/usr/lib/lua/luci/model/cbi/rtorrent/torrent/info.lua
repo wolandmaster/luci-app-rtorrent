@@ -1,49 +1,91 @@
--- Copyright 2014-2018 Sandor Balazsi <sandor.balazsi@gmail.com>
+-- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- Licensed to the public under the GNU General Public License.
 
+local nixio = require "nixio"
 local rtorrent = require "rtorrent"
+local util = require "luci.util"
 local common = require "luci.model.cbi.rtorrent.common"
+local array = require "luci.model.cbi.rtorrent.array"
+require "luci.model.cbi.rtorrent.string"
 
-local hash = arg[1]
-local details = rtorrent.batchcall({"name", "custom1", "timestamp.started", "timestamp.finished"}, hash, "d.")
+local hash = unpack(arg)
+local form, infohash, url, started, finished, status, tags, comment
 
-f = SimpleForm("rtorrent", details["name"])
-f.redirect = luci.dispatcher.build_url("admin/rtorrent/main")
+local torrent = array(rtorrent.batchcall("d.", hash,
+	"name", "timestamp.started", "timestamp.finished", "message",
+	"custom1", "custom=icon", "custom=url", "custom=comment"))
 
-t = f:section(Table, list)
-t.template = "rtorrent/list"
-t.pages = common.get_torrent_pages(hash)
-t.page = "Info"
-
-hash_id = f:field(DummyValue, "hash", "Hash")
-function hash_id.cfgvalue(self, section)
-	return hash
+_G.redirect = luci.dispatcher.build_url("admin", "rtorrent", "main",
+	unpack(util.restore_data(luci.http.getcookie("rtorrent-main"))))
+form = SimpleForm("rtorrent", torrent:get("name"))
+form.template = "rtorrent/simpleform"
+form.all_tabs = array():append("info", "files", "trackers", "peers", "chunks"):get()
+form.tab_url_postfix = function(tab)
+	local filters = array(util.restore_data(luci.http.getcookie("rtorrent-" .. tab) or ""))
+	return filters:get(1) == hash and filters:join("/") or hash
 end
-
-started = f:field(DummyValue, "started", "Download started")
-started.value = details["timestamp.started"] == 0
-	and "not yet started"
-	or os.date("!%Y-%m-%d %H:%M:%S", details["timestamp.started"])
-
-finished = f:field(DummyValue, "finished", "Download finished")
-finished.value = details["timestamp.finished"] == 0
-	and "not yet finished"
-	or os.date("!%Y-%m-%d %H:%M:%S", details["timestamp.finished"])
-
-tags = f:field(Value, "tags", "Tags")
-tags.default = details["custom1"]
-tags.rmempty = false
-
-function tags.write(self, section, value)
-	rtorrent.call("d.custom1.set", hash, value)
-end
-
-function f.handle(self, state, data)    
+form.handle = function(self, state, data)
 	if state == FORM_VALID then
-		luci.http.redirect(luci.dispatcher.build_url("admin/rtorrent/info/") .. hash)
+		luci.http.redirect(nixio.getenv("REQUEST_URI"))
 	end
 	return true
 end
 
-return f
+infohash = form:field(DummyValue, "hash", "Hash")
+infohash.template = "rtorrent/dvalue"
+infohash.rawhtml = true
+infohash.value = '<div class="cbi-dummy">%s</div>' % hash
 
+local torrent_url = torrent:get("custom_url"):urldecode()
+url = form:field(DummyValue, "url", "Torrent URL")
+url.template = "rtorrent/dvalue"
+url.rawhtml = true
+url.value = '<div class="cbi-dummy">%s</div>' % (torrent_url:blank()
+	and 'Unknown, added by an uploaded torrent file or magnet URI.'
+	or '<a href="%s" target="_blank">%s</a>' % { torrent_url , torrent_url })
+
+started = form:field(DummyValue, "started", "Download started")
+started.template = "rtorrent/dvalue"
+started.rawhtml = true
+started.value = '<div class="cbi-dummy">%s</div>' % (torrent:get("timestamp_started") == 0
+	and "not yet started"
+	or os.date("!%Y-%m-%d %H:%M:%S", torrent:get("timestamp_started")))
+
+finished = form:field(DummyValue, "finished", "Download finished")
+finished.template = "rtorrent/dvalue"
+finished.rawhtml = true
+finished.value = '<div class="cbi-dummy">%s</div>' % (torrent:get("timestamp_finished") == 0
+	and "not yet finished"
+	or os.date("!%Y-%m-%d %H:%M:%S", torrent:get("timestamp_finished")))
+
+status = form:field(DummyValue, "status", "Status")
+status.template = "rtorrent/dvalue"
+status.rawhtml = true
+status.value = '<div class="cbi-dummy">%s</div>' % torrent:get("message")
+
+tags = form:field(Value, "tags", "Tags")
+tags.cfgvalue = function(self, section) return torrent:get("custom1") end
+tags.write = function(self, section, value)
+	rtorrent.call("d.custom1.set", hash, value)
+end
+tags.remove = function(self, section)
+	if self:cfgvalue(section) ~= "" then
+		self:write(section, "")
+	end
+end
+
+comment = form:field(TextValue, "comment", "Comment")
+comment.rows = 5
+comment.cfgvalue = function(self, section)
+	return torrent:get("custom_comment"):urldecode()
+end
+comment.write = function(self, section, value)
+	rtorrent.call("d.custom.set", hash, "comment", value:urlencode())
+end
+comment.remove = function(self, section)
+	if self:cfgvalue(section) ~= "" then
+		self:write(section, "")
+	end
+end
+
+return form
