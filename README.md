@@ -1,5 +1,7 @@
 # luci-app-rtorrent
-rTorrent client for OpenWrt's LuCI web interface
+rTorrent frontend for OpenWrt's LuCI web interface
+
+:new: _2021-06-24: Complete rewrite from scratch ([0.2.0](https://github.com/wolandmaster/luci-app-rtorrent/releases/tag/0.2.0))_
 
 ## Features
 - List all torrent downloads
@@ -13,3 +15,65 @@ rTorrent client for OpenWrt's LuCI web interface
 - OpenWrt device independent (written in lua)
 - Opkg package manager support
 - RSS feed downloader (automatically download torrents that match the specified criteria)
+
+## Install instructions
+
+### Install rtorrent-rpc
+```
+opkg update
+opkg install rtorrent-rpc screen
+```
+### Create rTorrent config file
+
+#### Minimal _/root/.rtorrent.rc_ file (don't forget to update the paths!):
+```
+directory = /path/to/downloads/
+session = /path/to/session/
+
+scgi_port = 127.0.0.1:5000
+
+schedule2 = rss_downloader, 60, 300, ((execute.throw, /usr/lib/lua/rss_downloader.lua, --uci))
+```
+
+### Create _/etc/init.d/rtorrent_ autostart script
+```
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=99
+
+start() {  
+  screen -dmS rtorrent rtorrent
+}
+
+stop() {
+  killall rtorrent
+}
+```
+
+### Start rtorrent
+```
+chmod +x /etc/init.d/rtorrent
+/etc/init.d/rtorrent enable
+/etc/init.d/rtorrent start
+```
+
+### Install luci-app-rtorrent
+```
+opkg install libustream-openssl
+wget -q https://github.com/wolandmaster/luci-app-rtorrent/releases/download/latest/e1a1ba8004c4220f -O /etc/opkg/keys/e1a1ba8004c4220f
+echo 'src/gz luci_app_rtorrent https://github.com/wolandmaster/luci-app-rtorrent/releases/download/latest' >> /etc/opkg.conf
+opkg update
+opkg install luci-app-rtorrent
+```
+
+### Upgrade already installed version
+```
+opkg update
+opkg upgrade luci-app-rtorrent
+```
+
+### References
+<https://www.pcsuggest.com/openwrt-torrent-download-box-luci/>
+
+<https://medium.com/openwrt-iot/lede-openwrt-setting-up-torrent-downloading-a06fe37a1ea2>
