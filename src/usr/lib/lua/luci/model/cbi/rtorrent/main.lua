@@ -88,7 +88,6 @@ function compute_tabs(torrent, index, torrents, tabs, tab)
 	if index == 1 then
 		local torrent_tags = array(torrents:map(function(torrent)
 			return torrent:get("tags") end):join(" "):split()):unique():sort()
-		tabs:insert("all")
 		if torrent_tags:contains("incomplete") then tabs:insert("incomplete") end
 		torrent_tags:foreach(function(tag) tabs:insert(tag) end)
 		tabs:insert(tab)
@@ -190,7 +189,7 @@ function filter_by_tab(torrent, index, torrents, tab)
 	return string.find(" " .. torrent:get("tags") .. " ", " " .. tab .. " ")
 end
 
-local tabs, checked, total = array(), array(), array():set("count", 0)
+local tabs, checked, total = array({ "all" }), array(), array():set("count", 0)
 local torrents = array(rtorrent.multicall("d.", "", "default",
 	"hash", "name", "hashing", "state", "is_active", "complete",
 	"size_bytes", "bytes_done", "size_chunks", "wanted_chunks", "completed_chunks", "chunk_size",
