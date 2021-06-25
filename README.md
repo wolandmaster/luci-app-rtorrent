@@ -16,6 +16,9 @@ rTorrent frontend for OpenWrt's LuCI web interface
 - Opkg package manager support
 - RSS feed downloader (automatically download torrents that match the specified criteria)
 
+## Screenshots
+[luci-app-rtorrent 0.2.0](https://github.com/wolandmaster/luci-app-rtorrent/wiki/Screenshots) 
+
 ## Install instructions
 
 ### Install rtorrent-rpc
