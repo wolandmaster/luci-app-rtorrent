@@ -11,12 +11,13 @@ local throttle = array(rtorrent.batchcall("throttle.", "",
 	"max_downloads", "max_uploads", "min_peers.normal", "max_peers.normal",
 	"min_peers.seed", "max_peers.seed"))
 local trackers = array(rtorrent.batchcall("trackers.", "", "numwant", "use_udp"))
-local network = array(rtorrent.batchcall("network.", "", "http.max_open", "max_open_files", "max_open_sockets"))
+local network = array(rtorrent.batchcall("network.", "",
+	"http.max_open", "max_open_files", "max_open_sockets", "xmlrpc.size_limit"))
 
 local form, bandwidth_limits, download_limit, upload_limit
 local global_limits, max_downloads_global, max_uploads_global
 local torrent_limits, max_downloads, max_uploads, min_peers, max_peers, min_seeds, max_seeds, peers_numwant
-local network_limits, max_http_requests, max_open_files, max_open_sockets
+local network_limits, max_http_requests, max_open_files, max_open_sockets, max_xmlrpc_size
 
 form = SimpleForm("rtorrent", "rTorrent Settings",
 	"The below settings are change the running rTorrent instance only!<br />"
@@ -202,6 +203,18 @@ max_open_sockets.datatype = "uinteger"
 max_open_sockets.write = function(self, section, value)
 	if value ~= tostring(max_open_sockets.default) then
 		rtorrent.call("network.max_open_sockets.set", "", value)
+	end
+end
+
+max_xmlrpc_size = network_limits:option(Value, "max_xmlrpc_size", "Maximum XML-RPC size",
+	"Maximum size of any XML-RPC requests in bytes.<br />"
+	.. "Human-readable forms such as 2M are also allowed (for 2 MiB, i.e. 2097152 bytes).<br />"
+	.. "Related <i>.rtorrent.rc</i> config line: <code>network.xmlrpc.size_limit.set</code>.")
+max_xmlrpc_size.rmempty = false
+max_xmlrpc_size.default = network:get("xmlrpc_size_limit")
+max_xmlrpc_size.write = function(self, section, value)
+	if value ~= tostring(max_xmlrpc_size.default) then
+		rtorrent.call("network.xmlrpc.size_limit.set", "", value)
 	end
 end
 
