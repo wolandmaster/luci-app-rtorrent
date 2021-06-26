@@ -22,7 +22,7 @@
 			action.addEventListener("click", async function(event) {
 				if (!event.target.matches("span.open") && !event.target.matches("li.focus")) {
 					let selected = 0;
-					await eachElement("div.tr input[type=checkbox]",
+					await eachElement(".tr input[type=checkbox]",
 						checkbox => selected += checkbox.checked ? 1 : 0);
 					if (selected == 0) {
 						alert("No torrent selected!\n"

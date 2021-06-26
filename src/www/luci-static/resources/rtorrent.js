@@ -25,7 +25,7 @@ function eachElement(selector, callback, scope) {
 
 async function updateInvertSelection(invertSelection) {
 	let count = 0, selected = 0;
-	await eachElement("div.tr:not(:last-child) input[type=checkbox]", checkbox => {
+	await eachElement(".tr:not(:last-child) input[type=checkbox]", checkbox => {
 		count++; selected += checkbox.checked ? 1 : 0;
 	});
 	invertSelection.checked = (selected == count);

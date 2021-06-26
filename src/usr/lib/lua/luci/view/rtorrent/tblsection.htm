@@ -30,26 +30,26 @@
 	document.addEventListener("luci-loaded", function() {
 		<% for i, node in ipairs(self.children) do
 			if node.classes ~= nil and next(node.classes) ~= nil then %>
-		eachElement("#<%=self.name%> div.th:nth-child(<%=i%>), "
-				+ "#<%=self.name%> div:not(.placeholder) > div.td:nth-child(<%=i%>)",
+		eachElement("#<%=self.name%> .th:nth-child(<%=i%>), "
+				+ "#<%=self.name%> :not(.placeholder) > .td:nth-child(<%=i%>)",
 			cell => cell.classList.add("<%=table.concat(node.classes, '", "')%>"));
 			<% end
 		end %>
 		<% if #self:cfgsections() > 1
 		   and self.map:get(self:cfgsections()[#self:cfgsections()], ".total_row") then %>
-		eachElement("div.tr:last-child > div.td", cell => cell.classList.add("bold"));
-		eachElement("div.tr:not(:last-child) input[type=checkbox]", checkbox => {
+		eachElement(".tr:last-child > .td", cell => cell.classList.add("bold"));
+		eachElement(".tr:not(:last-child) input[type=checkbox]", checkbox => {
 			checkbox.addEventListener("change", async function() {
 				const invertSelection = (await selectElement(
-					"div.tr:last-child input[type=checkbox]"))[0];
+					".tr:last-child input[type=checkbox]"))[0];
 				updateInvertSelection(invertSelection);
 			});
 		});
-		eachElement("div.tr:last-child input[type=checkbox]", async invertSelection => {
+		eachElement(".tr:last-child input[type=checkbox]", async invertSelection => {
 			updateInvertSelection(invertSelection);
 			invertSelection.addEventListener("change", async function() {
 				let count = 0, selected = 0;
-				await eachElement("div.tr:not(:last-child) input[type=checkbox]", checkbox => {
+				await eachElement(".tr:not(:last-child) input[type=checkbox]", checkbox => {
 					checkbox.checked = !checkbox.checked;
 					count++; selected += checkbox.checked ? 1 : 0;
 				});
@@ -59,24 +59,24 @@
 		document.forms[0].addEventListener("reset", function() {
 			setTimeout(async function() {
 				const invertSelection = (await selectElement(
-					"div.tr:last-child input[type=checkbox]"))[0];
+					".tr:last-child input[type=checkbox]"))[0];
 				updateInvertSelection(invertSelection);
 			}, 1);
 		});
-		eachElement("div.tr:not(:last-child) select", select => {
+		eachElement(".tr:not(:last-child) select", select => {
 			select.addEventListener("change", async function() {
-				const batchSelect = (await selectElement("div.tr:last-child select"))[0];
+				const batchSelect = (await selectElement(".tr:last-child select"))[0];
 				const selectedValues = new Set();
-				await eachElement("div.tr:not(:last-child) select:not(.hidden)", select => {
+				await eachElement(".tr:not(:last-child) select:not(.hidden)", select => {
 					selectedValues.add(select.value);
 				});
 				if (selectedValues.size > 1) { batchSelect.value = "mixed"; }
 				else { batchSelect.value = selectedValues.values().next().value; }
 			});
 		});
-		eachElement("div.tr:last-child select", batchSelect => {
+		eachElement(".tr:last-child select", batchSelect => {
 			batchSelect.addEventListener("change", async function() {
-				await eachElement("div.tr:not(:last-child) select:not(.hidden)", select => {
+				await eachElement(".tr:not(:last-child) select:not(.hidden)", select => {
 					select.value = batchSelect.value;
 				});
 			});

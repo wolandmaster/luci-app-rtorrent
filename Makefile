@@ -31,7 +31,7 @@ packages-file: ipk
 	mkdir -p ipk
 	cp control/control ipk/Packages
 	echo "Filename: $(IPK)" >> ipk/Packages
-	du -b ipk/$(IPK) | awk '{print "Size:", $$1}' >> ipk/Packages
+	wc -c ipk/$(IPK) | awk '{print "Size:", $$1}' >> ipk/Packages
 	sha256sum ipk/$(IPK) | awk '{print "SHA256sum:", $$1}' >> ipk/Packages
 	usign -S -m ipk/Packages -s key/sign_key
 	gzip ipk/Packages

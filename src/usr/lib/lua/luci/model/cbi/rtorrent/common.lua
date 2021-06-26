@@ -1,6 +1,7 @@
 -- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- Licensed to the public under the GNU General Public License.
 
+local socket = require "socket"
 local url = require "socket.url"
 local http = require "socket.http"
 local https = require "ssl.https"
@@ -13,7 +14,7 @@ local rtorrent = require "rtorrent"
 local array = require "luci.model.cbi.rtorrent.array"
 require "luci.model.cbi.rtorrent.string"
 
-local string, table, os, math, socket, unpack = string, table, os, math, socket, unpack
+local string, table, os, math, unpack = string, table, os, math, unpack
 local type, ipairs, tostring, tonumber = type, ipairs, tostring, tonumber
 local getmetatable = getmetatable
 
