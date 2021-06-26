@@ -67,7 +67,7 @@ chmod +x /etc/init.d/rtorrent
 
 ### Install luci-app-rtorrent
 ```
-opkg install libustream-openssl
+opkg install libustream-wolfssl
 wget -q https://github.com/wolandmaster/luci-app-rtorrent/releases/download/latest/e1a1ba8004c4220f -O /etc/opkg/keys/e1a1ba8004c4220f
 echo 'src/gz luci_app_rtorrent https://github.com/wolandmaster/luci-app-rtorrent/releases/download/latest' >> /etc/opkg.conf
 opkg update
