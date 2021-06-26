@@ -46,7 +46,11 @@ START=99
 STOP=99
 
 start() {  
-  screen -dmS rtorrent rtorrent
+  HOME=/root screen -dmS rtorrent nice -19 rtorrent
+}
+
+boot() {
+  start "$@"
 }
 
 stop() {
