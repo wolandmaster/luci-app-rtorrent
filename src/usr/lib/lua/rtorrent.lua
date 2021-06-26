@@ -1,20 +1,18 @@
 -- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- Licensed to the public under the GNU General Public License.
 
-local ipairs, string, tostring, tonumber, table = ipairs, string, tostring, tonumber, table
-local assert, type, unpack = assert, type, unpack
+local assert, ipairs, tostring, string, table, unpack = assert, ipairs, tostring, string, table, unpack
 
-local nixio = require "nixio"
+local fs = require "nixio.fs"
 local socket = require "socket"
 local xmlrpc = require "xmlrpc"
 local scgi = require "xmlrpc.scgi"
 
-local SCGI_ADDRESS = "localhost"
-local SCGI_PORT = 5000
+local rtorrent_config_file = "/root/.rtorrent.rc"
 
 module "rtorrent"
 
-function format(results, commands)
+local function format(results, commands)
 	local formatted_results = {}
 	for _, result in ipairs(results) do
 		local formatted = {}
@@ -27,15 +25,18 @@ function format(results, commands)
 end
 
 function call(method, ...)
-	local ok, res = scgi.call(SCGI_ADDRESS, SCGI_PORT, method, ...)
+	local address, port = ("\n" .. tostring(fs.readfile(rtorrent_config_file)))
+		:match("\n%s*scgi_port%s*=%s*([^:]+):(%d+)")
+	assert(address, "\n\nError: scgi port not defined in your " .. rtorrent_config_file .. " config file!\n"
+		.. 'Please add to it, e.g.: "scgi_port = 127.0.0.1:6000".\n')
+	local ok, res = scgi.call(address, port, method, ...)
 	if not ok and res == "socket connect failed" then
-		assert(ok, "\n\nFailed to connect to rtorrent: rpc port not reachable!\n"
-			.. "Possible reasons:\n"
-			.. "- not the rpc version of rtorrent is installed\n"
-			.. "- scgi port is not defined in .rtorrent.rc (scgi_port = 127.0.0.1:5000)\n"
-			.. "- rtorrent is not running (ps | grep [r]torrent)\n")
+		assert(ok, "\n\nFailed to connect to rtorrent: rpc port not reachable"
+			.. " on " .. address .. ":" .. port .. "!\nPossible reasons:\n"
+			.. "- rtorrent is not running (ps w | grep [r]torrent)\n"
+			.. "- not the rpc version of rtorrent is installed\n")
 	end
-	assert(ok, string.format("XML-RPC call failed on client: %s", tostring(res)))
+	assert(ok, string.format("\n\nXML-RPC call failed: %s!\n", tostring(res)))
 	return res
 end
 

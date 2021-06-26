@@ -17,7 +17,7 @@ rTorrent frontend for OpenWrt's LuCI web interface
 - RSS feed downloader (automatically download torrents that match the specified criteria)
 
 ## Screenshots
-[luci-app-rtorrent 0.2.0](https://github.com/wolandmaster/luci-app-rtorrent/wiki/Screenshots) 
+[luci-app-rtorrent 0.2.0](https://github.com/wolandmaster/luci-app-rtorrent/wiki/Screenshots)
 
 ## Install instructions
 
@@ -33,7 +33,7 @@ opkg install rtorrent-rpc screen
 directory = /path/to/downloads/
 session = /path/to/session/
 
-scgi_port = 127.0.0.1:5000
+scgi_port = 127.0.0.1:6000
 
 schedule2 = rss_downloader, 60, 300, ((execute.throw, /usr/lib/lua/rss_downloader.lua, --uci))
 ```
@@ -45,7 +45,7 @@ schedule2 = rss_downloader, 60, 300, ((execute.throw, /usr/lib/lua/rss_downloade
 START=99
 STOP=99
 
-start() {  
+start() {
   HOME=/root screen -dmS rtorrent nice -19 rtorrent
 }
 
