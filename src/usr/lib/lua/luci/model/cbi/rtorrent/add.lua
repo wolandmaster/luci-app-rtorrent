@@ -15,7 +15,9 @@ local uploads = "/etc/luci-uploads/rtorrent"
 local form, uri, file, dir, tags, start
 
 form = SimpleForm("rtorrent", "Add Torrent")
+form.template = "rtorrent/simpleform"
 form.submit = "Add"
+form.notifications = {}
 form.parse = function(self, ...)
 	local state = SimpleForm.parse(self, ...)
 	if state == FORM_VALID then
@@ -24,6 +26,10 @@ form.parse = function(self, ...)
 			file:add_error(1, "missing", "Either a torrent URL / magnet URI or "
 				.. "an uploaded torrent file must be provided!")
 			state = FORM_INVALID
+		else
+			for _, torrent in torrents:pairs() do
+				table.insert(form.notifications, "Added <i>%s</i>" % torrent:get("name"))
+			end
 		end
 	end
 	return state
@@ -55,6 +61,8 @@ uri.validate = function(self, value, section)
 				if not content then errors:insert("Failed to encode torrent: " .. err .. "!")
 				else
 					torrents:insert({
+						["name"] = magnet:get("dn")
+							and magnet:get("dn"):get(1) or line:trim(),
 						["data"] = nixio.bin.b64encode(content),
 						["icon"] = common.tracker_icon(common.extract_urls(magnet))
 					})
@@ -76,6 +84,7 @@ uri.validate = function(self, value, section)
 				else
 					-- TODO: extract comment from torrent file
 					torrents:insert({
+						["name"] = data.info.name,
 						["data"] = nixio.bin.b64encode(content),
 						["icon"] = common.tracker_icon(array({ line:trim(),
 							unpack(common.extract_urls(array(data)):get()) })),
@@ -114,6 +123,7 @@ file.validate = function(self, value, section)
 	end
 	-- TODO: extract comment from torrent file
 	torrents:insert({
+		["name"] = data.info.name,
 		["data"] = nixio.bin.b64encode(content),
 		["icon"] = common.tracker_icon(common.extract_urls(array(data)))
 	})
