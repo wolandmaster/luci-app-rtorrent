@@ -35,6 +35,8 @@ session = /path/to/session/
 
 scgi_port = 127.0.0.1:6000
 
+method.set_key = event.download.erased, on_erase, "branch=d.custom5=,\"execute2={rm,-rf,--,$d.base_path=}\""
+
 schedule2 = rss_downloader, 60, 300, ((execute.throw, /usr/lib/lua/rss_downloader.lua, --uci))
 ```
 
