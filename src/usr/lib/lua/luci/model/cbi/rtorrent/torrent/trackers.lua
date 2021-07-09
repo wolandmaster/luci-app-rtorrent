@@ -102,7 +102,7 @@ function format.peers(value)
 end
 
 local total = array():set("count", 0)
-local torrent = array(rtorrent.batchcall("d.", hash, "name", "state"))
+local torrent = array(rtorrent.batchcall("d.", hash, "name", "state", "is_active"))
 local trackers = array(rtorrent.multicall("t.", hash, "",
 	"is_enabled", "url", "latest_new_peers", "latest_sum_peers",
 	"failed_counter", "success_counter", "success_time_last", "failed_time_last",
@@ -217,7 +217,13 @@ add.write = function(self, section, value)
 	for i, line in ipairs(value:split("\r\n")) do
 		rtorrent.call("d.tracker.insert", hash, (tracker_count + i - 1) % 33, line:trim())
 	end
-	rtorrent.batchcall("d.", hash, "stop", "close", "start")
+	if torrent:get("state") > 0 then
+		if torrent:get("is_active") == 0 then
+			rtorrent.batchcall("d.", hash, "stop", "close", "start", "pause")
+		else
+			rtorrent.batchcall("d.", hash, "stop", "close", "start")
+		end
+	end
 end
 
 return form
