@@ -13,35 +13,28 @@ require "luci.model.cbi.rtorrent.string"
 local torrents = array()
 local uploads = "/etc/luci-uploads/rtorrent"
 local form, uri, file, dir, tags, start
+common.remove_cookie("rtorrent-notifications")
 
 form = SimpleForm("rtorrent", "Add Torrent")
 form.template = "rtorrent/simpleform"
 form.submit = "Add"
-form.notifications = {}
-form.parse = function(self, ...)
-	local state = SimpleForm.parse(self, ...)
-	if state == FORM_VALID then
-		if torrents:empty() then
-			uri:add_error(1, "missing")
-			file:add_error(1, "missing", "Either a torrent URL / magnet URI or "
-				.. "an uploaded torrent file must be provided!")
-			state = FORM_INVALID
-		else
-			for _, torrent in torrents:pairs() do
-				table.insert(form.notifications, "Added <i>%s</i>" % torrent:get("name"))
-			end
-		end
-	end
-	return state
-end
+form.notifications = common.get_cookie("rtorrent-notifications", {})
 form.handle = function(self, state, data)
+	if state ~= FORM_NODATA and torrents:empty() then
+		uri:add_error(1, "missing")
+		file:add_error(1, "missing", "Either a torrent URL / magnet URI or "
+			.. "an uploaded torrent file must be provided!")
+		return true, FORM_INVALID
+	end
 	if state == FORM_VALID then
 		for _, torrent in torrents:pairs() do
 			torrent:set("start", data.start):set("directory", data.dir):set("tags", data.tags)
 			common.add_to_rtorrent(torrent)
+			table.insert(form.notifications, "Added <i>%s</i>" % torrent:get("name"))
 		end
-		uri:remove(1)
 		file:remove(1)
+		common.set_cookie("rtorrent-notifications", form.notifications)
+		luci.http.redirect(nixio.getenv("REQUEST_URI"))
 	end
 	return true
 end
@@ -134,7 +127,9 @@ dir = form:field(Value, "dir", "Download directory")
 dir.default = rtorrent.call("directory.default")
 dir.rmempty = false
 dir.validate = function(self, value, section)
-	if value and not datatypes.directory(value) then
+	if not value then
+		return nil, "Download directory must be provided!"
+	elseif not datatypes.directory(value) then
 		return nil, "Directory '" .. value .. "' does not exists!"
 	elseif not nixio.fs.access(value, "w") then
 		return nil, "Directory '" .. value .. "' write permission denied!"

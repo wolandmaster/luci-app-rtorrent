@@ -2,16 +2,15 @@
 -- Licensed to the public under the GNU General Public License.
 
 local rtorrent = require "rtorrent"
-local util = require "luci.util"
 local build_url = require "luci.dispatcher".build_url
 local common = require "luci.model.cbi.rtorrent.common"
 local array = require "luci.model.cbi.rtorrent.array"
 require "luci.model.cbi.rtorrent.string"
 
 local compute, format, hash, sort, page = {}, {}, unpack(arg)
-luci.http.header("Set-Cookie", "rtorrent-trackers=%s; Path=%s; SameSite=Strict" % {
-	util.serialize_data({ hash, sort, page }):urlencode(), build_url("admin", "rtorrent")
-})
+common.set_cookie("rtorrent-trackers", { hash, sort, page })
+common.remove_cookie("rtorrent-notifications")
+
 sort = sort or "status-asc"
 page = page and tonumber(page) or 1
 local sort_column, sort_order = unpack(sort:split("-"))
@@ -23,6 +22,7 @@ function compute_total(tracker, index, trackers, total)
 	total:increment("seeds", tracker:get("seeds"))
 	total:increment("leeches", tracker:get("leeches"))
 	total:increment("downloaded", tracker:get("downloaded"))
+	total:get("urls"):insert(tracker:get("url"))
 	if trackers:last(index) then
 		format_values(total:set(".total_row", true)
 			:set("url", "TOTAL: %d pcs." % total:get("count"))
@@ -101,7 +101,7 @@ function format.peers(value)
 	}
 end
 
-local total = array():set("count", 0)
+local total = array():set("count", 0):set("urls", array())
 local torrent = array(rtorrent.batchcall("d.", hash, "name", "state", "is_active"))
 local trackers = array(rtorrent.multicall("t.", hash, "",
 	"is_enabled", "url", "latest_new_peers", "latest_sum_peers",
@@ -116,18 +116,20 @@ local trackers = array(rtorrent.multicall("t.", hash, "",
 
 local form, list, icon, url, status, peers, seeds, leeches, downloaded, updated, enabled, add
 
-_G.redirect = build_url("admin", "rtorrent", "main",
-	unpack(util.restore_data(luci.http.getcookie("rtorrent-main"))))
+_G.redirect = build_url("admin", "rtorrent", "main", unpack(common.get_cookie("rtorrent-main", {})))
 form = SimpleForm("rtorrent", torrent:get("name"))
 form.template = "rtorrent/simpleform"
+form.notifications = common.get_cookie("rtorrent-notifications", {})
 form.all_tabs = array():append("info", "files", "trackers", "peers", "chunks"):get()
 form.tab_url_postfix = function(tab)
-	local filters = tab == "trackers" and array(arg)
-		or array(util.restore_data(luci.http.getcookie("rtorrent-" .. tab) or ""))
+	local filters = (tab == "trackers") and array(arg) or array(common.get_cookie("rtorrent-" .. tab, {}))
 	return filters:get(1) == hash and filters:join("/") or hash
 end
 form.handle = function(self, state, data)
-	if state == FORM_VALID then luci.http.redirect(nixio.getenv("REQUEST_URI")) end
+	if state == FORM_VALID then
+		common.set_cookie("rtorrent-notifications", form.notifications)
+		luci.http.redirect(nixio.getenv("REQUEST_URI"))
+	end
 	return true
 end
 form.cancel = "Trigger tracker scrape"
@@ -194,17 +196,21 @@ enabled.write = function(self, section, value)
 	end
 end
 
-add = form:field(TextValue, "add_tracker", "Add tracker(s)",
-	"All tracker URL should be in a separate line.")
+add = form:field(TextValue, "add_tracker", "Add tracker(s)", "All tracker URL should be in a separate line.")
 add.rows = 2
 add.validate = function(self, value, section)
 	local errors = array()
 	for _, line in ipairs(value:split("\r\n")) do
 		if not line:trim():lower():match("^%w+://[%w_-]+%.[%w_-]+") then
 			errors:insert("Invalid URL: %s" % line:trim())
+		elseif total:get("urls"):contains(line:trim()) then
+			table.insert(form.notifications, "Skipped existing tracker <i>%s</i>" % line:trim())
+		else
+			table.insert(form.notifications, "Added tracker <i>%s</i>" % line:trim())
 		end
 	end
 	if not errors:empty() then
+		form.notifications = {}
 		for i, err in errors:pairs() do
 			if not errors:last(i) then self:add_error(section, err) end
 		end
@@ -213,11 +219,15 @@ add.validate = function(self, value, section)
 	return value
 end
 add.write = function(self, section, value)
-	local tracker_count = trackers:filter(function(value) return value:get("index") end):size()
-	for i, line in ipairs(value:split("\r\n")) do
-		rtorrent.call("d.tracker.insert", hash, (tracker_count + i - 1) % 33, line:trim())
+	local tracker_group = trackers:filter(function(value) return value:get("index") end):size()
+	local tracker_added = false
+	for _, line in ipairs(value:split("\r\n")) do
+		if not total:get("urls"):contains(line:trim()) then
+			rtorrent.call("d.tracker.insert", hash, tracker_group, line:trim())
+			tracker_group, tracker_added = (tracker_group + 1) % 33, true
+		end
 	end
-	if torrent:get("state") > 0 then
+	if tracker_added and torrent:get("state") > 0 then
 		if torrent:get("is_active") == 0 then
 			rtorrent.batchcall("d.", hash, "stop", "close", "start", "pause")
 		else

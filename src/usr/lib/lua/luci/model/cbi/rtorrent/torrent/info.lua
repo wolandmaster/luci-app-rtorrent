@@ -3,7 +3,7 @@
 
 local nixio = require "nixio"
 local rtorrent = require "rtorrent"
-local util = require "luci.util"
+local build_url = require "luci.dispatcher".build_url
 local common = require "luci.model.cbi.rtorrent.common"
 local array = require "luci.model.cbi.rtorrent.array"
 require "luci.model.cbi.rtorrent.string"
@@ -15,13 +15,12 @@ local torrent = array(rtorrent.batchcall("d.", hash,
 	"name", "timestamp.started", "timestamp.finished", "message",
 	"custom1", "custom=icon", "custom=url", "custom=comment"))
 
-_G.redirect = luci.dispatcher.build_url("admin", "rtorrent", "main",
-	unpack(util.restore_data(luci.http.getcookie("rtorrent-main"))))
+_G.redirect = build_url("admin", "rtorrent", "main", unpack(common.get_cookie("rtorrent-main", {})))
 form = SimpleForm("rtorrent", torrent:get("name"))
 form.template = "rtorrent/simpleform"
 form.all_tabs = array():append("info", "files", "trackers", "peers", "chunks"):get()
 form.tab_url_postfix = function(tab)
-	local filters = array(util.restore_data(luci.http.getcookie("rtorrent-" .. tab) or ""))
+	local filters = array(common.get_cookie("rtorrent-" .. tab, {}))
 	return filters:get(1) == hash and filters:join("/") or hash
 end
 form.handle = function(self, state, data)

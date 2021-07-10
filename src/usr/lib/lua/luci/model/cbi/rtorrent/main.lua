@@ -10,17 +10,13 @@
 
 local nixio = require "nixio"
 local rtorrent = require "rtorrent"
-local util = require "luci.util"
 local common = require "luci.model.cbi.rtorrent.common"
 local array = require "luci.model.cbi.rtorrent.array"
 local build_url = require "luci.dispatcher".build_url
 require "luci.model.cbi.rtorrent.string"
 
 local compute, format, action, tab, sort, page = {}, {}, {}, unpack(arg)
-
-luci.http.header("Set-Cookie", "rtorrent-main=%s; Path=%s; SameSite=Strict" % {
-	util.serialize_data({ tab, sort, page }):urlencode(), build_url("admin", "rtorrent")
-})
+common.set_cookie("rtorrent-main", { tab, sort, page })
 
 tab = tab or "all"
 local default_sort = "name-asc"
@@ -179,7 +175,7 @@ function action.start(hash)
 	elseif status.is_active == 0 then rtorrent.call("d.resume", hash) end
 end
 
-function action.pause(hash) rtorrent.call("d.pause", hash) end
+function action.pause(hash) rtorrent.batchcall("d.", hash, "start", "pause") end
 function action.stop(hash) rtorrent.batchcall("d.", hash, "stop", "close") end
 function action.hash(hash) rtorrent.call("d.check_hash", hash) end
 function action.remove(hash) rtorrent.batchcall("d.", hash, "close", "erase") end

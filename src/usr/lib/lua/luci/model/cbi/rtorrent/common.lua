@@ -7,7 +7,10 @@ local http = require "socket.http"
 local https = require "ssl.https"
 local ltn12 = require "ltn12"
 local nixio = require "nixio"
+local util = require "luci.util"
+local lhttp = require "luci.http"
 local uci = require "luci.model.uci".cursor()
+local build_url = require "luci.dispatcher".build_url
 local datatypes = require "luci.cbi.datatypes"
 local xmlrpc = require "xmlrpc"
 local rtorrent = require "rtorrent"
@@ -293,4 +296,20 @@ function rss_downloader_status()
 			.. "with an initial delay of <i>60</i> seconds after rTorrent startup:<br /><code>schedule2 = "
 			.. "rss_downloader, 60, 300, ((execute.throw, /usr/lib/lua/rss_downloader.lua, --uci))</code>"
 	end
+end
+
+function set_cookie(name, data, attributes)
+	attributes = attributes or ""
+	lhttp.header("Set-Cookie", "%s=%s; Path=%s; SameSite=Strict%s" % {
+		name, data and util.serialize_data(data):urlencode() or "", build_url("admin", "rtorrent"), attributes
+	})
+end
+
+function get_cookie(name, default)
+	local cookie = lhttp.getcookie(name)
+	return cookie and util.restore_data(cookie) or default
+end
+
+function remove_cookie(name)
+	set_cookie(name, nil, "; Max-Age=0")
 end

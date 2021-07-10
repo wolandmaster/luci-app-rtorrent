@@ -3,16 +3,14 @@
 
 local nixio = require "nixio"
 local rtorrent = require "rtorrent"
-local util = require "luci.util"
 local build_url = require "luci.dispatcher".build_url
 local common = require "luci.model.cbi.rtorrent.common"
 local array = require "luci.model.cbi.rtorrent.array"
 require "luci.model.cbi.rtorrent.string"
 
 local hash, page = unpack(arg)
-luci.http.header("Set-Cookie", "rtorrent-chunks=%s; Path=%s; SameSite=Strict" % {
-	util.serialize_data({ hash, page }):urlencode(), build_url("admin", "rtorrent")
-})
+common.set_cookie("rtorrent-chunks", { hash, page })
+
 page = page and tonumber(page) or 1
 
 local torrent = array(rtorrent.batchcall("d.", hash,
@@ -40,16 +38,14 @@ end)
 local form, summary, list, offset
 local chunks_count, chunk_size, completed_chunks, wanted_chunks, excluded_chunks, download_done
 
-_G.redirect = build_url("admin", "rtorrent", "main",
-	unpack(util.restore_data(luci.http.getcookie("rtorrent-main"))))
+_G.redirect = build_url("admin", "rtorrent", "main", unpack(common.get_cookie("rtorrent-main", {})))
 form = SimpleForm("rtorrent", torrent:get("name"))
 form.template = "rtorrent/simpleform"
 form.submit = false
 form.reset = false
 form.all_tabs = array():append("info", "files", "trackers", "peers", "chunks"):get()
 form.tab_url_postfix = function(tab)
-	local filters = tab == "chunks" and array(arg)
-		or array(util.restore_data(luci.http.getcookie("rtorrent-" .. tab) or ""))
+	local filters = (tab == "chunks") and array(arg) or array(common.get_cookie("rtorrent-" .. tab, {}))
 	return filters:get(1) == hash and filters:join("/") or hash
 end
 form.handle = function(self, state, data)
