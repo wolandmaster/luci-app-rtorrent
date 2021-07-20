@@ -6,6 +6,11 @@
 'require rpc';
 
 const domParser = new DOMParser();
+const rtorrentRpc = rpc.declare({
+	object: 'luci.rtorrent',
+	method: 'rtorrent_rpc',
+	params: [ 'xml' ]
+});
 
 function escapeXml(str) {
 	return str.replace(/[<>&'"]/g, function(chr) {
@@ -118,19 +123,13 @@ function decodeXmlRpc(xml) {
 }
 
 function toCamelCase(str) {
-	return str.toLowerCase().replace(/[._=\s]+(.)?/g, (_, chr) => chr ? chr.toUpperCase() : '');
+	return str.toLowerCase().replace(/[.,_=\s]+(.)?/g, (_, chr) => chr ? chr.toUpperCase() : '');
 }
 
 return baseclass.extend({
 
-	rtorrentRpc: rpc.declare({
-		object: 'luci.rtorrent',
-		method: 'rtorrent_rpc',
-		params: [ 'xml' ]
-	}),
-
 	rtorrentCall: async function(method, ...params) {
-		let response = await this.rtorrentRpc(encodeXmlRpc(method, params));
+		let response = await rtorrentRpc(encodeXmlRpc(method, params));
 		if ('error' in response) {
 			// TODO
 			return [[]];
@@ -139,18 +138,31 @@ return baseclass.extend({
 		}
 	},
 
-	rtorrentMulticall: async function(methodType, hash, filter, ...command) {
+	rtorrentMulticall: async function(methodType, hash, filter, ...commands) {
 		const method = (methodType === 'd.') ? 'd.multicall2' : methodType + 'multicall';
-		const commands = command.map(cmd => methodType + cmd + (cmd.includes('=') ? '' : '='));
-		const results = await this.rtorrentCall(method, hash, filter, ...commands);
+		const completeCommands = commands.map(cmd => methodType + cmd + (cmd.includes('=') ? '' : '='));
+		const results = await this.rtorrentCall(method, hash, filter, ...completeCommands);
 		return results.map(result => {
 			let object = {};
-			command.forEach((key, i) => object[ toCamelCase(key) ] = result[i]);
+			commands.forEach((key, i) => object[ toCamelCase(key) ] = result[i]);
 			return object;
 		});
 	},
 
-	rtorrentBatchcall: function(methodType, hash, ...methods) {
+	rtorrentBatchcall: async function(methodType, hash, ...commands) {
+		let methods = [];
+		commands.forEach(cmd => {
+			let params = [ hash ];
+			if (cmd.includes('=')) {
+				params.push(...cmd.split('=')[1].split(','));
+			}
+			methods.push({ methodName: methodType + cmd.split('=')[0], params });
+		});
+		const results = await this.rtorrentCall('system.multicall', methods);
+		let object = {};
+		results.forEach((result, i) => object[ toCamelCase(commands[i]) ]
+			= (result.length === 1) ? result[0] : result);
+		return object;
 	}
 
 });
