@@ -8,7 +8,7 @@
 
 return view.extend({
 	render: function() {
-		var table = E('table', { 'class': 'table' }, [
+		const table = E('table', { 'class': 'table' }, [
 			E('tr', { 'class': 'tr table-titles' }, [
 				E('th', { 'class': 'th' }, [ _('Name') ]),
 				E('th', { 'class': 'th' }, [ _('Size') ]),
@@ -19,11 +19,9 @@ return view.extend({
 			])
 		]);
 
-		poll.add(function() {
-			tools.rtorrentCall('d.multicall2', '', 'default',
-				'd.name=', 'd.size_bytes=', 'd.state=', 'd.down.rate=', 'd.up.rate=', 'd.ratio=')
-				.then(data => cbi_update_table(table, data, E('em', _('No torrents added yet.'))));
-		}, 10);
+		poll.add(() => tools.rtorrentCall('d.multicall2', '', 'default',
+			'd.name=', 'd.size_bytes=', 'd.state=', 'd.down.rate=', 'd.up.rate=', 'd.ratio=')
+			.then(data => cbi_update_table(table, data, E('em', _('No torrents added yet.')))), 10);
 
 		return table;
 	},
