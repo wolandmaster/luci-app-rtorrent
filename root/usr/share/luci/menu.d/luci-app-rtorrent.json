@@ -1,0 +1,20 @@
+{
+	"admin/rtorrent": {
+		"title": "Torrent",
+		"order": 70,
+		"action": {
+			"type": "firstchild"
+		},
+		"depends": {
+			"acl": [ "luci-app-rtorrent" ]
+		}
+	},
+	"admin/rtorrent/torrents": {
+		"title": "List",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "rtorrent/torrents"
+		}
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"luci-app-rtorrent": {
+		"description": "Grant access for luci-app-rtorrent",
+		"read": {
+			"ubus": {
+				"luci.rtorrent": [ "rtorrent_rpc" ]
+			},
+			"uci": [ "rtorrent" ]
+		},
+		"write": {
+			"uci": [ "rtorrent" ]
+		}
+	}
+}
