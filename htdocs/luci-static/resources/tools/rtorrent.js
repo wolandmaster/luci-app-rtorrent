@@ -14,7 +14,7 @@ const rtorrentRpc = rpc.declare({
 
 function escapeXml(str) {
 	return str.replace(/[<>&'"]/g, function(chr) {
-		switch(chr) {
+		switch (chr) {
 			case '<': return '&lt;';
 			case '>': return '&gt;';
 			case '&': return '&amp;';
@@ -25,7 +25,7 @@ function escapeXml(str) {
 }
 
 function encodeXmlRpcParam(param) {
-	switch(typeof(param)) {
+	switch (typeof(param)) {
 		case 'string':
 			return '<string>' + escapeXml(param) + '</string>';
 		case 'boolean':
@@ -83,7 +83,7 @@ function encodeXmlRpc(method, params) {
 }
 
 function decodeXmlRpc(xml) {
-	switch(xml.tagName) {
+	switch (xml.tagName) {
 		case 'string':
 			return xml.textContent;
 		case 'boolean':
@@ -127,8 +127,7 @@ function toCamelCase(str) {
 }
 
 return baseclass.extend({
-
-	rtorrentCall: async function(method, ...params) {
+	'rtorrentCall': async function(method, ...params) {
 		let response = await rtorrentRpc(encodeXmlRpc(method, params));
 		if ('error' in response) {
 			// TODO
@@ -137,8 +136,7 @@ return baseclass.extend({
 			return decodeXmlRpc(domParser.parseFromString(response.xml, 'text/xml').documentElement);
 		}
 	},
-
-	rtorrentMulticall: async function(methodType, hash, filter, ...commands) {
+	'rtorrentMulticall': async function(methodType, hash, filter, ...commands) {
 		const method = (methodType === 'd.') ? 'd.multicall2' : methodType + 'multicall';
 		const completeCommands = commands.map(cmd => methodType + cmd + (cmd.includes('=') ? '' : '='));
 		const results = await this.rtorrentCall(method, hash, filter, ...completeCommands);
@@ -148,8 +146,7 @@ return baseclass.extend({
 			return object;
 		});
 	},
-
-	rtorrentBatchcall: async function(methodType, hash, ...commands) {
+	'rtorrentBatchcall': async function(methodType, hash, ...commands) {
 		let methods = [];
 		commands.forEach(cmd => {
 			let params = [ hash ];
@@ -163,6 +160,86 @@ return baseclass.extend({
 		results.forEach((result, i) => object[ toCamelCase(commands[i]) ]
 			= (result.length === 1) ? result[0] : result);
 		return object;
+	},
+	'computeValues': function(data, compute) {
+		data.forEach((row, index) => {
+			compute.forEach((func, key) => {
+				row[ key ] = func(key, row, index, data);
+			});
+		});
+		return data;
+	},
+	'formatValues': function(data, format) {
+		return data.map((row, index) => Object.keys(row).reduce((result, key) => {
+			result[ key ] = (key in format)
+				? format[ key ](row[ key ], key, row, index, data) : row[ key ];
+			return result;
+		}, {}));
+	},
+	'updateTable': function(table, data, formattedData, placeholder) {
+		const titles = Array.from(table.querySelectorAll('.tr.table-titles .th'));
+		const rows = Array.from(table.querySelectorAll('.tr[ data-key ]'));
+		data.filter(dataRow => dataRow.key).forEach((dataRow, rowIndex) => {
+			let row = table.querySelector(`.tr[ data-key="${dataRow.key}" ]`);
+			if (row) {
+				rows.splice(rows.indexOf(row), 1);
+			} else {
+				row = table.appendChild(E('tr', { 'data-key': dataRow.key, 'class': 'tr' }));
+				titles.forEach(title => row.appendChild(E('td', {
+					'data-key': title.dataset.key, 'class': title.className
+				})).classList.replace('th', 'td'));
+			}
+			titles.filter(title => title.dataset.key).forEach(title => {
+				const td = row.querySelector(`.td[ data-key = "${title.dataset.key}" ]`);
+				if (td.dataset.raw != dataRow[ title.dataset.key ]) {
+					td.dataset.raw = dataRow[ title.dataset.key ];
+					const content = formattedData[ rowIndex ][ title.dataset.key ];
+					if (isElem(content)) {
+						while (td.firstChild) { td.removeChild(td.firstChild); }
+						td.appendChild(content);
+					} else {
+						td.innerHTML = content;
+					}
+					console.log('updated:', td);
+				}
+			});
+		});
+		rows.forEach(deletedRow => table.removeChild(deletedRow));
+		table.querySelectorAll('img[ data-src ]').forEach(img => {
+			img.setAttribute('src', img.dataset.src); img.removeAttribute('data-src');
+		});
+		if (placeholder && table.firstElementChild === table.lastElementChild) {
+			const row = table.appendChild(E('tr', { 'class': 'tr placeholder' }));
+			row.appendChild(E('td', { 'class': 'td' }, placeholder));
+		}
+	},
+	'humanSize': function(bytes) {
+		const units = [ 'B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB' ];
+		const exp = (bytes > 0) ? Math.floor(Math.log(bytes) / Math.log(1024)) : 0;
+		const value = bytes / Math.pow(1024, exp);
+		const accuracy = (bytes > 0) ? 2 - Math.floor(Math.log10(value)) : 2;
+		return value.toFixed(accuracy >= 0 ? accuracy : 0) + ' ' + units[ exp ];
+	},
+	'humanDate': function(epoch) {
+		return new Date((epoch + new Date().getTimezoneOffset() * -60) * 1000)
+			.toISOString().replace('T', ' ').replace('.000Z', '');
+	},
+	'humanTime': function(sec) {
+		const time = new Date(1970, 0, 1);
+		time.setSeconds(sec);
+		if (time.getMonth() > 0) {
+			return '&#8734;';
+		} else if (time.getDate() > 1) {
+			return (time.getDate() - 1) + 'd<br>' + time.getHours() + 'h ' + time.getMinutes() + 'm';
+		} else if (time.getHours() > 0) {
+			return time.getHours() + 'h<br>' + time.getMinutes() + 'm ' + time.getSeconds() + 's';
+		} else if (time.getMinutes() > 0) {
+			return time.getMinutes() + 'm ' + time.getSeconds() + 's';
+		} else {
+			return time.getSeconds() + 's';
+		}
+	},
+	'getDomain': function(url) {
+		return url.match(/:\/\/[^/:]+/) ? new URL(url).hostname : url.split("/").pop().split(".")[0];
 	}
-
 });
