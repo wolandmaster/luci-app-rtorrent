@@ -213,6 +213,32 @@ return baseclass.extend({
 			row.appendChild(E('td', { 'class': 'td' }, placeholder));
 		}
 	},
+	'sortTable': function(table, sort) {
+		Array.from(table.querySelectorAll('.tr[ data-key ]')).sort(function(leftRow, rightRow) {
+			for (const sortBy of sort[ table.dataset.sort ]) {
+				const [ key, order ] = sortBy.split('-');
+				let leftValue = leftRow.querySelector(`.td[ data-key = "${key}" ]`).dataset.raw;
+				let rightValue = rightRow.querySelector(`.td[ data-key = "${key}" ]`).dataset.raw;
+				if (order == 'desc') { [ leftValue, rightValue ] = [ rightValue, leftValue ]; }
+				const compare = (!isNaN(leftValue) && !isNaN(rightValue))
+					? leftValue - rightValue : leftValue.toString().localeCompare(rightValue);
+				if (compare != 0) { return compare; }
+			}
+			return 0;
+		}).forEach(tr => table.appendChild(tr));
+	},
+	'changeSorting': function(th, sort) {
+		const table = th.closest('table');
+		const [ key, order ] = table.dataset.sort.split('-');
+		if (th.dataset.key == key) {
+			th.dataset.order = order;
+			th.dataset.order = (th.dataset.order == 'asc') ? 'desc' : 'asc';
+		}
+		table.querySelectorAll('.th').forEach(th => th.classList.remove('active'));
+		th.classList.add('active');
+		table.dataset.sort = th.dataset.key + '-' + th.dataset.order;
+		this.sortTable(table, sort);
+	},
 	'humanSize': function(bytes) {
 		const units = [ 'B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB' ];
 		const exp = (bytes > 0) ? Math.floor(Math.log(bytes) / Math.log(1024)) : 0;

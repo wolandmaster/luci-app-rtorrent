@@ -50,9 +50,7 @@ const compute = new Map([[
 			return Infinity;
 		}
 	} ], [
-	'check', function(key, row) {
-		return 0;
-	} ]
+	'check', function(key, row) { return 0; } ]
 ])
 
 const format = {
@@ -102,21 +100,64 @@ const format = {
 	}
 };
 
+const sort = {
+	'name-asc': [ 'name-asc' ],
+	'name-desc': [ 'name-desc' ],
+	'size-asc': [ 'size-asc', 'name-asc' ],
+	'size-desc': [ 'size-desc', 'name-asc' ],
+	'done-asc': [ 'done-asc', 'name-asc' ],
+	'done-desc': [ 'done-desc', 'name-asc' ],
+	'status-asc': [ 'status-asc', 'download-desc', 'upload-desc', 'name-asc' ],
+	'status-desc': [ 'status-desc', 'download-desc', 'upload-desc', 'name-asc' ],
+	'seeder-asc': [ 'seeder-asc', 'leecher-asc', 'name-asc' ],
+	'seeder-desc': [ 'seeder-desc', 'leecher-desc', 'name-asc' ],
+	'leecher-asc': [ 'leecher-asc', 'seeder-asc', 'name-asc' ],
+	'leecher-desc': [ 'leecher-desc', 'seeder-desc', 'name-asc' ],
+	'download-asc': [ 'download-asc', 'upload-asc', 'name-asc' ],
+	'download-desc': [ 'download-desc', 'upload-desc', 'name-asc' ],
+	'upload-asc': [ 'upload-asc', 'download-asc', 'name-asc' ],
+	'upload-desc': [ 'upload-desc', 'download-desc', 'name-asc' ],
+	'ratio-asc': [ 'ratio-asc', 'name-asc' ],
+	'ratio-desc': [ 'ratio-desc', 'name-asc' ],
+	'eta-asc': [ 'eta-asc', 'name-asc' ],
+	'eta-desc': [ 'eta-desc', 'name-asc' ]
+};
+
 return view.extend({
 	'render': function() {
-		const table = E('table', { 'class': 'table' }, [
+		const table = E('table', { 'class': 'table', 'data-sort': 'name-asc' }, [
 			E('tr', { 'class': 'tr table-titles' }, [
-				E('th', { 'data-key': 'icon', 'class': 'th shrink' }),
-				E('th', { 'data-key': 'name', 'class': 'th wrap' }, [ _('Name') ]),
-				E('th', { 'data-key': 'size', 'class': 'th shrink center nowrap' }, [ _('Size') ]),
-				E('th', { 'data-key': 'done', 'class': 'th shrink center' }, [ _('Done') ]),
-				E('th', { 'data-key': 'status', 'class': 'th shrink center' }, [ _('Status') ]),
-				E('th', { 'data-key': 'seeder', 'class': 'th shrink center' }, '&#9660;'),
-				E('th', { 'data-key': 'leecher', 'class': 'th shrink center' }, '&#9650;'),
-				E('th', { 'data-key': 'download', 'class': 'th shrink center' }, [ _('DL') ]),
-				E('th', { 'data-key': 'upload', 'class': 'th shrink center' }, [ _('UL') ]),
-				E('th', { 'data-key': 'ratio', 'class': 'th shrink center' }, [ _('Ratio') ]),
-				E('th', { 'data-key': 'eta', 'class': 'th shrink nowrap center' }, [ _('ETA') ]),
+				E('th', { 'class': 'th shrink', 'data-key': 'icon' }),
+				E('th', { 'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
+					  'title': 'Sort by name',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Name') ]),
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'size', 'data-order': 'desc',
+					  'title': 'Sort by size',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Size') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'done', 'data-order': 'desc',
+					  'title': 'Sort by download done percent',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Done') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'status', 'data-order': 'asc',
+					  'title': 'Sort by status',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Status') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'seeder', 'data-order': 'desc',
+					  'title': 'Sort by seeder count',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9660;'),
+				E('th', { 'class': 'th shrink center', 'data-key': 'leecher', 'data-order': 'desc',
+					  'title': 'Sort by leecher count',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9650;'),
+				E('th', { 'class': 'th shrink center', 'data-key': 'download', 'data-order': 'desc',
+					  'title': 'Sort by download speed (kB/s)',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('DL') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'upload', 'data-order': 'desc',
+					  'title': 'Sort by upload speed (kB/s)',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('UL') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'ratio', 'data-order': 'desc',
+					  'title': 'Sort by download/upload ratio',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Ratio') ]),
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'eta', 'data-order': 'desc',
+					  'title': 'Sort by Estimated Time of Arrival',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('ETA') ]),
 				E('th', { 'data-key': 'check', 'class': 'th shrink center' })
 			])
 		]);
@@ -126,9 +167,11 @@ return view.extend({
 			'size_bytes', 'bytes_done', 'size_chunks', 'wanted_chunks', 'completed_chunks', 'chunk_size',
 			'peers_accounted', 'peers_complete', 'down.rate', 'up.rate', 'ratio', 'up.total',
 			'timestamp.started', 'timestamp.finished', 'custom1', 'custom=icon')
-			.then(data => tools.updateTable(table,
-				tools.computeValues(data, compute), tools.formatValues(data, format),
-				_('No torrents added yet.'))), 10);
+			.then(data => {
+				tools.updateTable(table, tools.computeValues(data, compute),
+					tools.formatValues(data, format), _('No torrents added yet.'));
+				tools.sortTable(table, sort);
+			}), 10);
 
 		return table;
 	},

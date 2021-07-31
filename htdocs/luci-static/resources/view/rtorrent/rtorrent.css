@@ -5,3 +5,6 @@
 .orange { color: #cc7000 }
 .green { color: #00a100 }
 .blue { color: #0000bf }
+.active { color: #0069d6 }
+.hidden { display: none }
+.th:not(:empty) { cursor: pointer }
