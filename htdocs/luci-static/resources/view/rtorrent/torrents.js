@@ -81,8 +81,8 @@ const format = {
 			'title': _('Total uploaded') + ': ' + tools.humanSize(row.upTotal)
 		}, (value / 1000).toFixed(2));
 	},
-	'download': function(value) { return (value / 1000).toFixed(2); },
-	'upload': function(value) { return (value / 1000).toFixed(2); },
+	'download': function(value) { return tools.humanSpeed(value); },
+	'upload': function(value) { return tools.humanSpeed(value); },
 	'eta': function(value, key, row) {
 		const downloadStarted = (row.timestampStarted != 0)
 			? tools.humanDate(row.timestampStarted) : _('not yet started');
@@ -92,7 +92,7 @@ const format = {
 		return E('div', {
 			'title': _('Download started') + ': ' + downloadStarted + '\n'
 				+ _('Download finished') + ': ' + downloadFinished,
-			'class': (value == Infinity) ? 'red' : null
+			'class': (value == Infinity || text === '&#8734;') ? 'red' : null
 		}, text);
 	},
 	'check': function(value) {
@@ -131,32 +131,32 @@ return view.extend({
 				E('th', { 'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
 					  'title': 'Sort by name',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Name') ]),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'size', 'data-order': 'desc',
-					  'title': 'Sort by size',
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'size',
+					  'title': 'Sort by size', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Size') ]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'done', 'data-order': 'desc',
-					  'title': 'Sort by download done percent',
+				E('th', { 'class': 'th shrink center', 'data-key': 'done',
+					  'title': 'Sort by download percentage', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Done') ]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'status', 'data-order': 'asc',
-					  'title': 'Sort by status',
+				E('th', { 'class': 'th shrink center', 'data-key': 'status',
+					  'title': 'Sort by status', 'data-order': 'asc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Status') ]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'seeder', 'data-order': 'desc',
-					  'title': 'Sort by seeder count',
+				E('th', { 'class': 'th shrink center', 'data-key': 'seeder',
+					  'title': 'Sort by seeder count', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9660;'),
-				E('th', { 'class': 'th shrink center', 'data-key': 'leecher', 'data-order': 'desc',
-					  'title': 'Sort by leecher count',
+				E('th', { 'class': 'th shrink center', 'data-key': 'leecher',
+					  'title': 'Sort by leecher count', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9650;'),
-				E('th', { 'class': 'th shrink center', 'data-key': 'download', 'data-order': 'desc',
-					  'title': 'Sort by download speed (kB/s)',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('DL') ]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'upload', 'data-order': 'desc',
-					  'title': 'Sort by upload speed (kB/s)',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('UL') ]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'ratio', 'data-order': 'desc',
-					  'title': 'Sort by download/upload ratio',
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'download',
+					  'title': 'Sort by download speed', 'data-order': 'desc',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Download') ]),
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'upload',
+					  'title': 'Sort by upload speed', 'data-order': 'desc',
+					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Upload') ]),
+				E('th', { 'class': 'th shrink center', 'data-key': 'ratio',
+					  'title': 'Sort by download/upload ratio', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('Ratio') ]),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'eta', 'data-order': 'desc',
-					  'title': 'Sort by Estimated Time of Arrival',
+				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'eta',
+					  'title': 'Sort by Estimated Time of Arrival', 'data-order': 'desc',
 					  'click': ev => tools.changeSorting(ev.target, sort) }, [ _('ETA') ]),
 				E('th', { 'data-key': 'check', 'class': 'th shrink center' })
 			])

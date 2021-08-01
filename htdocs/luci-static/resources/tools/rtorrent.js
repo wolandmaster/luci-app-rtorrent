@@ -246,6 +246,9 @@ return baseclass.extend({
 		const accuracy = (bytes > 0) ? 2 - Math.floor(Math.log10(value)) : 2;
 		return value.toFixed(accuracy >= 0 ? accuracy : 0) + ' ' + units[ exp ];
 	},
+	'humanSpeed': function(bytes_per_sec) {
+		return this.humanSize(bytes_per_sec) + '/s';
+	},
 	'humanDate': function(epoch) {
 		return new Date((epoch + new Date().getTimezoneOffset() * -60) * 1000)
 			.toISOString().replace('T', ' ').replace('.000Z', '');

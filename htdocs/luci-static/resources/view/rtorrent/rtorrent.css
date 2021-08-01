@@ -7,4 +7,5 @@
 .blue { color: #0000bf }
 .active { color: #0069d6 }
 .hidden { display: none }
+.table .th, .table .td { padding: 10px 6px 9px }
 .th:not(:empty) { cursor: pointer }
