@@ -185,9 +185,13 @@ return baseclass.extend({
 				rows.splice(rows.indexOf(row), 1);
 			} else {
 				row = table.appendChild(E('tr', { 'data-key': dataRow.key, 'class': 'tr' }));
-				titles.forEach(title => row.appendChild(E('td', {
-					'data-key': title.dataset.key, 'class': title.className
-				})).classList.replace('th', 'td'));
+				titles.forEach(th => {
+					const td = row.appendChild(E('td', {
+						'class': th.className, 'data-key': th.dataset.key,
+					}));
+					td.classList.replace('th', 'td');
+					td.classList.remove('active');
+				});
 			}
 			titles.filter(title => title.dataset.key).forEach(title => {
 				const td = row.querySelector(`.td[ data-key = "${title.dataset.key}" ]`);
