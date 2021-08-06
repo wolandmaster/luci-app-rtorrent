@@ -9,8 +9,16 @@ const domParser = new DOMParser();
 const rtorrentRpc = rpc.declare({
 	object: 'luci.rtorrent',
 	method: 'rtorrent_rpc',
-	params: [ 'xml' ]
+	params: ['xml']
 });
+
+Element.prototype.insertChildAtIndex = function(index, child) {
+	if (index >= this.children.length) {
+		return this.appendChild(child);
+	} else {
+		return this.insertBefore(child, this.children[index]);
+	}
+}
 
 function escapeXml(str) {
 	return str.replace(/[<>&'"]/g, function(chr) {
@@ -113,7 +121,7 @@ function decodeXmlRpc(xml) {
 			}
 			return object;
 		case 'member':
-			return { [ xml.querySelector('name').textContent ]:
+			return { [xml.querySelector('name').textContent]:
 				decodeXmlRpc(xml.querySelector('value')) };
 		case 'base64':
 			return atob(xml.textContent);
@@ -124,6 +132,18 @@ function decodeXmlRpc(xml) {
 
 function toCamelCase(str) {
 	return str.toLowerCase().replace(/[.,_=\s]+(.)?/g, (_, chr) => chr ? chr.toUpperCase() : '');
+}
+
+function unique(value, index, array) {
+	return array.indexOf(value) === index;
+}
+
+function blank(value) {
+	return value.trim();
+}
+
+function capitalize(str) {
+	return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 return baseclass.extend({
@@ -142,14 +162,14 @@ return baseclass.extend({
 		const results = await this.rtorrentCall(method, hash, filter, ...completeCommands);
 		return results.map(result => {
 			let object = {};
-			commands.forEach((key, i) => object[ toCamelCase(key) ] = result[i]);
+			commands.forEach((key, i) => object[toCamelCase(key)] = result[i]);
 			return object;
 		});
 	},
 	'rtorrentBatchcall': async function(methodType, hash, ...commands) {
 		let methods = [];
 		commands.forEach(cmd => {
-			let params = [ hash ];
+			let params = [hash];
 			if (cmd.includes('=')) {
 				params.push(...cmd.split('=')[1].split(','));
 			}
@@ -157,34 +177,34 @@ return baseclass.extend({
 		});
 		const results = await this.rtorrentCall('system.multicall', methods);
 		let object = {};
-		results.forEach((result, i) => object[ toCamelCase(commands[i]) ]
+		results.forEach((result, i) => object[toCamelCase(commands[i])]
 			= (result.length === 1) ? result[0] : result);
 		return object;
 	},
 	'computeValues': function(data, compute) {
 		data.forEach((row, index) => {
 			compute.forEach((func, key) => {
-				row[ key ] = func(key, row, index, data);
+				row[key] = func(key, row, index, data);
 			});
 		});
 		return data;
 	},
 	'formatValues': function(data, format) {
 		return data.map((row, index) => Object.keys(row).reduce((result, key) => {
-			result[ key ] = (key in format)
-				? format[ key ](row[ key ], key, row, index, data) : row[ key ];
+			result[key] = (key in format)
+				? format[key](row[key], key, row, index, data) : row[key];
 			return result;
 		}, {}));
 	},
 	'updateTable': function(table, data, formattedData, placeholder) {
 		const titles = Array.from(table.querySelectorAll('.tr.table-titles .th'));
-		const rows = Array.from(table.querySelectorAll('.tr[ data-key ]'));
+		const rows = Array.from(table.querySelectorAll('.tr[data-key]'));
 		data.filter(dataRow => dataRow.key).forEach((dataRow, rowIndex) => {
-			let row = table.querySelector(`.tr[ data-key="${dataRow.key}" ]`);
+			let row = table.querySelector(`.tr[data-key="${dataRow.key}"]`);
 			if (row) {
 				rows.splice(rows.indexOf(row), 1);
 			} else {
-				row = table.appendChild(E('tr', { 'data-key': dataRow.key, 'class': 'tr' }));
+				row = table.appendChild(E('tr', { 'class': 'tr', 'data-key': dataRow.key }));
 				titles.forEach(th => {
 					const td = row.appendChild(E('td', {
 						'class': th.className, 'data-key': th.dataset.key,
@@ -193,11 +213,12 @@ return baseclass.extend({
 					td.classList.remove('active');
 				});
 			}
+			row.dataset.tags = dataRow.tags;
 			titles.filter(title => title.dataset.key).forEach(title => {
-				const td = row.querySelector(`.td[ data-key = "${title.dataset.key}" ]`);
-				if (td.dataset.raw != dataRow[ title.dataset.key ]) {
-					td.dataset.raw = dataRow[ title.dataset.key ];
-					const content = formattedData[ rowIndex ][ title.dataset.key ];
+				const td = row.querySelector(`.td[data-key = "${title.dataset.key}"]`);
+				if (td.dataset.raw != dataRow[title.dataset.key]) {
+					td.dataset.raw = dataRow[title.dataset.key];
+					const content = formattedData[rowIndex][title.dataset.key];
 					if (isElem(content)) {
 						while (td.firstChild) { td.removeChild(td.firstChild); }
 						td.appendChild(content);
@@ -209,7 +230,7 @@ return baseclass.extend({
 			});
 		});
 		rows.forEach(deletedRow => table.removeChild(deletedRow));
-		table.querySelectorAll('img[ data-src ]').forEach(img => {
+		table.querySelectorAll('img[data-src]').forEach(img => {
 			img.setAttribute('src', img.dataset.src); img.removeAttribute('data-src');
 		});
 		if (placeholder && table.firstElementChild === table.lastElementChild) {
@@ -218,12 +239,12 @@ return baseclass.extend({
 		}
 	},
 	'sortTable': function(table, sort) {
-		Array.from(table.querySelectorAll('.tr[ data-key ]')).sort(function(leftRow, rightRow) {
-			for (const sortBy of sort[ table.dataset.sort ]) {
-				const [ key, order ] = sortBy.split('-');
-				let leftValue = leftRow.querySelector(`.td[ data-key = "${key}" ]`).dataset.raw;
-				let rightValue = rightRow.querySelector(`.td[ data-key = "${key}" ]`).dataset.raw;
-				if (order == 'desc') { [ leftValue, rightValue ] = [ rightValue, leftValue ]; }
+		Array.from(table.querySelectorAll('.tr[data-key]')).sort(function(leftRow, rightRow) {
+			for (const sortBy of sort[table.dataset.sort]) {
+				const [key, order] = sortBy.split('-');
+				let leftValue = leftRow.querySelector(`.td[data-key="${key}"]`).dataset.raw;
+				let rightValue = rightRow.querySelector(`.td[data-key="${key}"]`).dataset.raw;
+				if (order == 'desc') { [leftValue, rightValue] = [rightValue, leftValue]; }
 				const compare = (!isNaN(leftValue) && !isNaN(rightValue))
 					? leftValue - rightValue : leftValue.toString().localeCompare(rightValue);
 				if (compare != 0) { return compare; }
@@ -233,7 +254,7 @@ return baseclass.extend({
 	},
 	'changeSorting': function(th, sort) {
 		const table = th.closest('table');
-		const [ key, order ] = table.dataset.sort.split('-');
+		const [key, order] = table.dataset.sort.split('-');
 		if (th.dataset.key == key) {
 			th.dataset.order = order;
 			th.dataset.order = (th.dataset.order == 'asc') ? 'desc' : 'asc';
@@ -243,12 +264,46 @@ return baseclass.extend({
 		table.dataset.sort = th.dataset.key + '-' + th.dataset.order;
 		this.sortTable(table, sort);
 	},
+	'updateTabs': function(table, data, tabs) {
+		const tags = data.map(row => row.tags.split(' ')).flat().filter(blank).sort();
+		if (tags.includes('incomplete')) { tags.splice(1, 0, 'incomplete'); }
+		const getTagText = function(tag) {
+			switch (tag) {
+				case 'all': return _('All');
+				case 'incomplete': return _('Incomplete');
+				default: return capitalize(tag);
+			}
+		};
+		Array.from(tabs.querySelectorAll('li')).filter(li => !tags.includes(li.dataset.tab))
+			.forEach(li => tabs.removeChild(li));
+		tags.filter(unique).forEach((tag, index) => {
+			if (tabs.children[index] === undefined || tabs.children[index].dataset.tab !== tag) {
+				tabs.insertChildAtIndex(index, E('li', {
+					'class': (tabs.dataset.filter === tag) ? 'cbi-tab' : 'cbi-tab-disabled',
+					'data-tab': tag, 'click': ev => this.filterTable(table, ev.target)
+				}, getTagText(tag)));
+			}
+		});
+		const currentTab = tabs.querySelector('li.cbi-tab');
+		this.filterTable(table, currentTab !== null ? currentTab : tabs.querySelector('li[data-tab="all"]'));
+	},
+	'filterTable': function(table, tab) {
+		const tabs = tab.closest('ul');
+		const currentTab = tabs.querySelector('li.cbi-tab');
+		if (currentTab !== tab) {
+			if (currentTab !== null ) { currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled'); }
+			tab.classList.replace('cbi-tab-disabled', 'cbi-tab');
+			tabs.dataset.filter = tab.dataset.tab;
+		}
+		table.querySelectorAll('.tr[data-key]').forEach(row => row.style.display =
+			(' ' + row.dataset.tags + ' ').includes(' ' + tabs.dataset.filter + ' ') ? '' : 'none');
+	},
 	'humanSize': function(bytes) {
-		const units = [ 'B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB' ];
+		const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
 		const exp = (bytes > 0) ? Math.floor(Math.log(bytes) / Math.log(1024)) : 0;
 		const value = bytes / Math.pow(1024, exp);
 		const accuracy = (bytes > 0) ? 2 - Math.floor(Math.log10(value)) : 2;
-		return value.toFixed(accuracy >= 0 ? accuracy : 0) + ' ' + units[ exp ];
+		return value.toFixed(accuracy >= 0 ? accuracy : 0) + ' ' + units[exp];
 	},
 	'humanSpeed': function(bytes_per_sec) {
 		return this.humanSize(bytes_per_sec) + '/s';
