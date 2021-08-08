@@ -3,6 +3,8 @@ rTorrent frontend for OpenWrt's LuCI web interface
 
 :new: _2021-06-24: Complete rewrite from scratch ([0.2.0](https://github.com/wolandmaster/luci-app-rtorrent/releases/tag/0.2.0))_
 
+:new: _202?-??-??: Complete rewrite from scratch No.2: this time in JavaScript ([0.3.0](https://github.com/wolandmaster/luci-app-rtorrent/tree/0.3.0))_
+
 ## Features
 - List all torrent downloads
 - Add new torrent by url/magnet uri/file
