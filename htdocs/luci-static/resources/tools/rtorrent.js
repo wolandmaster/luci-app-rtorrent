@@ -239,6 +239,12 @@ return baseclass.extend({
 		}
 	},
 	'sortTable': function(table, sort) {
+		const currentActive = table.querySelector('.th.active');
+		if (!currentActive || !table.dataset.sort.startsWith(currentActive.dataset.key + '-')) {
+			table.querySelectorAll('.th').forEach(th => th.classList.remove('active'));
+			const [key, order] = table.dataset.sort.split('-');
+			table.querySelector(`.th[data-key="${key}"]`).classList.add('active');
+		}
 		Array.from(table.querySelectorAll('.tr[data-key]')).sort(function(leftRow, rightRow) {
 			for (const sortBy of sort[table.dataset.sort]) {
 				const [key, order] = sortBy.split('-');
@@ -259,10 +265,11 @@ return baseclass.extend({
 			th.dataset.order = order;
 			th.dataset.order = (th.dataset.order == 'asc') ? 'desc' : 'asc';
 		}
-		table.querySelectorAll('.th').forEach(th => th.classList.remove('active'));
-		th.classList.add('active');
 		table.dataset.sort = th.dataset.key + '-' + th.dataset.order;
 		this.sortTable(table, sort);
+		const url = new URL(window.location);
+		url.searchParams.set('sort', table.dataset.sort);
+		history.replaceState({}, 'Sort by ' + table.dataset.sort, url);
 	},
 	'updateTabs': function(table, data, tabs) {
 		const tags = data.map(row => row.tags.split(' ')).flat().filter(blank).sort();
@@ -294,6 +301,9 @@ return baseclass.extend({
 			if (currentTab !== null ) { currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled'); }
 			tab.classList.replace('cbi-tab-disabled', 'cbi-tab');
 			tabs.dataset.filter = tab.dataset.tab;
+			const url = new URL(window.location);
+			url.searchParams.set('tab', tabs.dataset.filter);
+			history.replaceState({}, 'Filter by ' + tabs.dataset.filter, url);
 		}
 		table.querySelectorAll('.tr[data-key]').forEach(row => row.style.display =
 			(' ' + row.dataset.tags + ' ').includes(' ' + tabs.dataset.filter + ' ') ? '' : 'none');

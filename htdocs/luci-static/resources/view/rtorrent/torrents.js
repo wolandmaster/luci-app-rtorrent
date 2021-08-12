@@ -122,6 +122,8 @@ const sort = {
 
 return view.extend({
 	'render': function() {
+		const params = (new URL(document.location)).searchParams;
+
 		const style = E('style', { 'type': 'text/css' }, [
 			'.shrink { width: 1% }',
 			'.wrap { word-break: break-all }',
@@ -137,7 +139,8 @@ return view.extend({
 			'.cbi-tab, .cbi-tab-disabled { padding: 4px 6px; cursor: pointer; user-select: none }'
 		]);
 
-		const table = E('table', { 'class': 'table', 'data-sort': 'name-asc' }, [
+
+		const table = E('table', { 'class': 'table', 'data-sort': params.get('sort') || 'name-asc' }, [
 			E('tr', { 'class': 'tr table-titles' }, [
 				E('th', { 'class': 'th shrink', 'data-key': 'icon' }),
 				E('th', { 'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
@@ -174,7 +177,7 @@ return view.extend({
 			])
 		]);
 
-		const tabs = E('ul', { 'class': 'cbi-tabmenu', 'data-filter': 'all' });
+		const tabs = E('ul', { 'class': 'cbi-tabmenu', 'data-filter': params.get('tab') || 'all' });
 
 		poll.add(() => tools.rtorrentMulticall('d.', '', 'default',
 			'hash', 'name', 'hashing', 'state', 'is_active', 'complete',
