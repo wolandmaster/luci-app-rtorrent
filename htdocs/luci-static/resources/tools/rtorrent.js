@@ -257,6 +257,8 @@ return baseclass.extend({
 			}
 			return 0;
 		}).forEach(tr => table.appendChild(tr));
+		const totalRow = table.querySelector('.tr.table-total');
+		if (totalRow) { table.appendChild(totalRow); }
 	},
 	'changeSorting': function(th, sort) {
 		const table = th.closest('table');
@@ -271,7 +273,7 @@ return baseclass.extend({
 		url.searchParams.set('sort', table.dataset.sort);
 		history.replaceState({}, 'Sort by ' + table.dataset.sort, url);
 	},
-	'updateTabs': function(table, data, tabs) {
+	'updateTabs': function(table, data, tabs, total) {
 		const tags = data.map(row => row.tags.split(' ')).flat().filter(blank).sort();
 		if (tags.includes('incomplete')) { tags.splice(1, 0, 'incomplete'); }
 		const getTagText = function(tag) {
@@ -287,17 +289,20 @@ return baseclass.extend({
 			if (tabs.children[index] === undefined || tabs.children[index].dataset.tab !== tag) {
 				tabs.insertChildAtIndex(index, E('li', {
 					'class': (tabs.dataset.filter === tag) ? 'cbi-tab' : 'cbi-tab-disabled',
-					'data-tab': tag, 'click': ev => this.filterTable(table, ev.target)
+					'data-tab': tag,
+					'click': ev => this.filterTable(table, data, ev.target, total)
 				}, getTagText(tag)));
 			}
 		});
 		const currentTab = tabs.querySelector('li.cbi-tab');
-		this.filterTable(table, currentTab !== null ? currentTab : tabs.querySelector('li[data-tab="all"]'));
+		this.filterTable(table, data,
+			currentTab !== null ? currentTab : tabs.querySelector('li[data-tab="all"]'), total);
 	},
-	'filterTable': function(table, tab) {
+	'filterTable': function(table, data, tab, total) {
 		const tabs = tab.closest('ul');
 		const currentTab = tabs.querySelector('li.cbi-tab');
 		if (currentTab !== tab) {
+			table.querySelectorAll('input[type=checkbox].action').forEach(cb => cb.checked = false);
 			if (currentTab !== null ) { currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled'); }
 			tab.classList.replace('cbi-tab-disabled', 'cbi-tab');
 			tabs.dataset.filter = tab.dataset.tab;
@@ -305,8 +310,40 @@ return baseclass.extend({
 			url.searchParams.set('tab', tabs.dataset.filter);
 			history.replaceState({}, 'Filter by ' + tabs.dataset.filter, url);
 		}
-		table.querySelectorAll('.tr[data-key]').forEach(row => row.style.display =
-			(' ' + row.dataset.tags + ' ').includes(' ' + tabs.dataset.filter + ' ') ? '' : 'none');
+		table.querySelectorAll('.tr[data-key]').forEach(row => {
+			const rowHasTag = (' ' + row.dataset.tags + ' ').includes(' ' + tabs.dataset.filter + ' ');
+			row.classList.toggle('hidden', !rowHasTag);
+			data.filter(dataRow => dataRow.key === row.dataset.key)
+				.forEach(dataRow => dataRow.hidden = !rowHasTag);
+		});
+		this.updateTotal(table, data, total);
+	},
+	'updateTotal': function(table, data, total) {
+		const visibleData = data.filter(row => !row.hidden);
+		let totalRow = table.querySelector('.tr.table-total');
+		if (visibleData.length <= 1) {
+			if (totalRow) { table.removeChild(totalRow); }
+		} else {
+			if (!totalRow) {
+				totalRow = table.appendChild(E('tr', { 'class': 'tr table-total' }));
+				table.querySelectorAll('.tr.table-titles .th').forEach(th => {
+					const td = totalRow.appendChild(E('td', {
+						'class': th.className, 'data-key': th.dataset.key }));
+					td.classList.replace('th', 'td');
+					td.classList.remove('active');
+				});
+			}
+			Object.entries(total).forEach(([key, func]) => {
+				const td = totalRow.querySelector(`.td[data-key="${key}"]`);
+				const content = func(key, visibleData);
+				if (isElem(content)) {
+					while (td.firstChild) { td.removeChild(td.firstChild); }
+					td.appendChild(content);
+				} else {
+					td.innerHTML = content;
+				}
+			});
+		}
 	},
 	'humanSize': function(bytes) {
 		const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];

@@ -44,7 +44,7 @@ const compute = new Map([[
 			return Infinity;
 		}
 	}], [
-	'check', function(key, row) { return 0; }], [
+	'check', function() { return 0; }], [
 	'tags', function(key, row) {
 		return 'all ' + (row.wantedChunks > 0 ? 'incomplete ' : '') + row.custom1;
 	}]
@@ -93,7 +93,9 @@ const format = {
 		}, text);
 	},
 	'check': function(value) {
-		return E('input', { 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null });
+		return E('input', {
+			'class': 'action', 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null
+		});
 	}
 };
 
@@ -120,6 +122,15 @@ const sort = {
 	'eta-desc': ['eta-desc', 'name-asc']
 };
 
+const total = {
+	'name': function(key, data) {
+		return _('TOTAL') + ': ' + data.reduce(count => count += 1, 0) + ' ' + _('pcs.');
+	},
+	'size':	function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); },
+	'download': function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); },
+	'upload': function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); }
+};
+
 return view.extend({
 	'render': function() {
 		const params = (new URL(document.location)).searchParams;
@@ -136,9 +147,11 @@ return view.extend({
 			'.hidden { display: none }',
 			'.table .th, .table .td { padding: 10px 6px 9px }',
 			'.th:not(:empty) { cursor: pointer }',
+			'.tr.table-total .td { font-weight: bold }',
 			'.cbi-tab, .cbi-tab-disabled { padding: 4px 6px; cursor: pointer; user-select: none }'
 		]);
 
+		const title = E('h2', { 'name': 'content' }, _('Torrents'));
 
 		const table = E('table', { 'class': 'table', 'data-sort': params.get('sort') || 'name-asc' }, [
 			E('tr', { 'class': 'tr table-titles' }, [
@@ -185,13 +198,14 @@ return view.extend({
 			'peers_accounted', 'peers_complete', 'down.rate', 'up.rate', 'ratio', 'up.total',
 			'timestamp.started', 'timestamp.finished', 'custom1', 'custom=icon')
 			.then(data => {
-				tools.updateTable(table, tools.computeValues(data, compute),
+				tools.updateTable(table,
+					tools.computeValues(data, compute),
 					tools.formatValues(data, format), _('No torrents added yet.'));
-				tools.updateTabs(table, data, tabs);
+				tools.updateTabs(table, data, tabs, total);
 				tools.sortTable(table, sort);
 			}), 10);
 
-		return E([], [style, tabs, table]);
+		return E([], [style, title, tabs, table]);
 	},
 	'handleSaveApply': null,
 	'handleSave': null,
