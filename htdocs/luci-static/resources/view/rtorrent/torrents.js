@@ -48,9 +48,16 @@ const compute = new Map([[
 	'tags', function(key, row) {
 		return 'all ' + (row.wantedChunks > 0 ? 'incomplete ' : '') + row.custom1;
 	}]
-])
+]);
 
 const format = {
+	'name': function(value, key) {
+		// if (key) {
+		// TODO: add link
+		// } else {
+		return value;
+		// }
+	},
 	'icon': function(value) {
 		return E('img', {
 			'src': L.resource('icons/loading.gif'), 'data-src': value,
@@ -94,7 +101,8 @@ const format = {
 	},
 	'check': function(value) {
 		return E('input', {
-			'class': 'action', 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null
+			'class': 'action', 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null,
+			'change': function(ev) { tools.updateCheckbox(ev.target); }
 		});
 	}
 };
@@ -126,9 +134,10 @@ const total = {
 	'name': function(key, data) {
 		return _('TOTAL') + ': ' + data.reduce(count => count += 1, 0) + ' ' + _('pcs.');
 	},
-	'size':	function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); },
-	'download': function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); },
-	'upload': function(key, data) { return format[key](data.reduce((sum, row) => sum += row[key], 0)); }
+	'size':	function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
+	'download': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
+	'upload': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
+	'check': function() { return 0; }
 };
 
 return view.extend({
@@ -201,7 +210,7 @@ return view.extend({
 				tools.updateTable(table,
 					tools.computeValues(data, compute),
 					tools.formatValues(data, format), _('No torrents added yet.'));
-				tools.updateTabs(table, data, tabs, total);
+				tools.updateTabs(table, data, tabs, total, format);
 				tools.sortTable(table, sort);
 			}), 10);
 

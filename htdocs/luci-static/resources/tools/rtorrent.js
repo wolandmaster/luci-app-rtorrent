@@ -273,7 +273,7 @@ return baseclass.extend({
 		url.searchParams.set('sort', table.dataset.sort);
 		history.replaceState({}, 'Sort by ' + table.dataset.sort, url);
 	},
-	'updateTabs': function(table, data, tabs, total) {
+	'updateTabs': function(table, data, tabs, total, format) {
 		const tags = data.map(row => row.tags.split(' ')).flat().filter(blank).sort();
 		if (tags.includes('incomplete')) { tags.splice(1, 0, 'incomplete'); }
 		const getTagText = function(tag) {
@@ -290,19 +290,20 @@ return baseclass.extend({
 				tabs.insertChildAtIndex(index, E('li', {
 					'class': (tabs.dataset.filter === tag) ? 'cbi-tab' : 'cbi-tab-disabled',
 					'data-tab': tag,
-					'click': ev => this.filterTable(table, data, ev.target, total)
+					'click': ev => this.filterTable(table, data, ev.target, total, format)
 				}, getTagText(tag)));
 			}
 		});
 		const currentTab = tabs.querySelector('li.cbi-tab');
 		this.filterTable(table, data,
-			currentTab !== null ? currentTab : tabs.querySelector('li[data-tab="all"]'), total);
+			currentTab !== null ? currentTab : tabs.querySelector('li[data-tab="all"]'), total, format);
 	},
-	'filterTable': function(table, data, tab, total) {
+	'filterTable': function(table, data, tab, total, format) {
 		const tabs = tab.closest('ul');
 		const currentTab = tabs.querySelector('li.cbi-tab');
 		if (currentTab !== tab) {
-			table.querySelectorAll('input[type=checkbox].action').forEach(cb => cb.checked = false);
+			table.querySelectorAll('input[type=checkbox].action')
+				.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
 			if (currentTab !== null ) { currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled'); }
 			tab.classList.replace('cbi-tab-disabled', 'cbi-tab');
 			tabs.dataset.filter = tab.dataset.tab;
@@ -316,9 +317,9 @@ return baseclass.extend({
 			data.filter(dataRow => dataRow.key === row.dataset.key)
 				.forEach(dataRow => dataRow.hidden = !rowHasTag);
 		});
-		this.updateTotal(table, data, total);
+		this.updateTotal(table, data, total, format);
 	},
-	'updateTotal': function(table, data, total) {
+	'updateTotal': function(table, data, total, format) {
 		const visibleData = data.filter(row => !row.hidden);
 		let totalRow = table.querySelector('.tr.table-total');
 		if (visibleData.length <= 1) {
@@ -335,14 +336,38 @@ return baseclass.extend({
 			}
 			Object.entries(total).forEach(([key, func]) => {
 				const td = totalRow.querySelector(`.td[data-key="${key}"]`);
-				const content = func(key, visibleData);
-				if (isElem(content)) {
-					while (td.firstChild) { td.removeChild(td.firstChild); }
-					td.appendChild(content);
-				} else {
-					td.innerHTML = content;
+				const newValue = func(key, visibleData);
+				if (td.dataset.raw != newValue) {
+					td.dataset.raw = newValue;
+					const content = format[key](newValue);
+					if (isElem(content)) {
+						while (td.firstChild) { td.removeChild(td.firstChild); }
+						td.appendChild(content);
+					} else {
+						td.innerHTML = content;
+					}
 				}
 			});
+		}
+	},
+	'updateCheckbox': function(checkbox) {
+		const row = checkbox.closest('tr');
+		const table = row.closest('table');
+		if (row.classList.contains('table-total')) {
+			const totalCheckbox = checkbox;
+			let count = 0, selected = 0;
+			table.querySelectorAll('.tr[data-key]:not(.hidden) input[type=checkbox].action')
+				.forEach(cb => { cb.checked = !cb.checked; count++; selected += cb.checked ? 1 : 0; });
+			totalCheckbox.indeterminate = (selected > 0 && selected < count);
+		} else {
+			const totalCheckbox = table.querySelector('.tr.table-total input[type=checkbox].action');
+			if (totalCheckbox) {
+				let count = 0, selected = 0;
+				table.querySelectorAll('.tr[data-key]:not(.hidden) input[type=checkbox].action')
+					.forEach(cb => { count++; selected += cb.checked ? 1 : 0; });
+				totalCheckbox.checked = (selected === count);
+				totalCheckbox.indeterminate = (selected > 0 && selected < count);
+			}
 		}
 	},
 	'humanSize': function(bytes) {
