@@ -4,6 +4,7 @@
 'use strict';
 'require view';
 'require poll';
+'require ui';
 'require tools.rtorrent as tools';
 
 const compute = new Map([[
@@ -44,26 +45,26 @@ const compute = new Map([[
 			return Infinity;
 		}
 	}], [
-	'check', function() { return 0; }], [
+	'checked', function() { return 0; }], [
 	'tags', function(key, row) {
 		return 'all ' + (row.wantedChunks > 0 ? 'incomplete ' : '') + row.custom1;
 	}]
 ]);
 
 const format = {
-	'name': function(value, key) {
-		// if (key) {
-		// TODO: add link
-		// } else {
-		return value;
-		// }
-	},
 	'icon': function(value) {
 		return E('img', {
 			'src': L.resource('icons/loading.gif'), 'data-src': value,
 			'onerror': "this.src='" + L.resource('icons/unknown_tracker.svg') + "'",
 			'width': '16', 'height': '16', 'title': tools.getDomain(value)
 		});
+	},
+	'name': function(value, key) {
+		// if (key) {
+		// TODO: add link
+		// } else {
+		return value;
+		// }
 	},
 	'size': function(value) {
 		return E('div', { 'title': value + ' B' }, [tools.humanSize(value)]);
@@ -99,10 +100,10 @@ const format = {
 			'class': (value == Infinity || text === '&#8734;') ? 'red' : null
 		}, text);
 	},
-	'check': function(value) {
+	'checked': function(value, key, row, index, data) {
 		return E('input', {
 			'class': 'action', 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null,
-			'change': function(ev) { tools.updateCheckbox(ev.target); }
+			'change': ev => tools.updateCheckbox(ev.target)
 		});
 	}
 };
@@ -137,10 +138,92 @@ const total = {
 	'size':	function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
 	'download': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
 	'upload': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
-	'check': function() { return 0; }
+	'checked': function() { return 0; }
+};
+
+const action = {
+	'start': function(keys) {
+		return tools.rtorrentBatchcall(...keys.map(hash => [
+			'd.state=' + hash, 'd.is_active=' + hash
+		])).then(statuses => tools.rtorrentBatchcall(...keys.reduce((commands, hash, i) => {
+			if (statuses[i].state == 0) {
+				commands.push(['d.name=' + hash, 'd.start=' + hash]);
+			} else if (statuses[i].isActive == 0) {
+				commands.push(['d.name=' + hash, 'd.resume=' + hash]);
+			}
+			return commands;
+		}, [[]]))).then(results => results.forEach(result => {
+			if (result.start == 0) {
+				ui.addNotification(null, '<p>' + _('Started') + ' <i>' + result.name + '</i></p>');
+			} else if (result.resume == 0) {
+				ui.addNotification(null, '<p>' + _('Resumed') + ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	},
+	'pause': function(keys) {
+		return tools.rtorrentBatchcall([], ...keys.map(hash => [
+			'd.name=' + hash, 'd.state=' + hash, 'd.is_active=' + hash,
+			'd.start=' + hash, 'd.pause=' + hash
+		])).then(results => results.forEach(result => {
+			if ((result.state == 0 || result.isActive == 1) && result.start == 0 && result.pause == 0) {
+				ui.addNotification(null, '<p>' + _('Paused') + ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	},
+	'stop': function(keys) {
+		return tools.rtorrentBatchcall([], ...keys.map(hash => [
+			'd.name=' + hash, 'd.state=' + hash, 'd.stop=' + hash, 'd.close=' + hash
+		])).then(results => results.forEach(result => {
+			if (result.state == 1 && result.stop == 0 && result.close == 0) {
+				ui.addNotification(null, '<p>' + _('Stopped') + ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	},
+	'hash': function(keys) {
+		return tools.rtorrentBatchcall([], ...keys.map(hash => [
+			'd.name=' + hash, 'd.check_hash=' + hash
+		])).then(results => results.forEach(result => {
+			if (result.checkHash == 0) {
+				ui.addNotification(null, '<p>' + _('Checking hashes of')
+					+ ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	},
+	'remove': function(keys) {
+		return tools.rtorrentBatchcall([], ...keys.map(hash => [
+			'd.name=' + hash, 'd.close=' + hash, 'd.erase=' + hash
+		])).then(results => results.forEach(result => {
+			if (result.close == 0 && result.erase == 0) {
+				ui.addNotification(null, '<p>' + _('Removed') + ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	},
+	'purge': function(keys) {
+		return tools.rtorrentBatchcall([], ...keys.map(hash => [
+			'd.name=' + hash, 'd.custom5.set=' + hash + ',1', 'd.close=' + hash, 'd.erase=' + hash
+		])).then(results => results.forEach(result => {
+			if (result.close == 0 && result.erase == 0) {
+				ui.addNotification(null, '<p>' + _('Erased') + ' <i>' + result.name + '</i></p>');
+			}
+		}));
+	}
 };
 
 return view.extend({
+	'update': function(tabs, table) {
+		tools.rtorrentMulticall('d.', '', 'default',
+			'hash', 'name', 'hashing', 'state', 'is_active', 'complete',
+			'size_bytes', 'bytes_done', 'size_chunks', 'wanted_chunks', 'completed_chunks', 'chunk_size',
+			'peers_accounted', 'peers_complete', 'down.rate', 'up.rate', 'ratio', 'up.total',
+			'timestamp.started', 'timestamp.finished', 'custom1', 'custom=icon')
+			.then(data => {
+				tools.updateTable(table,
+					tools.computeValues(data, compute),
+					tools.formatValues(data, format), _('No torrents added yet.'));
+				tools.updateTabs(table, data, tabs, total, format);
+				tools.sortTable(table, sort);
+			});
+	},
 	'render': function() {
 		const params = (new URL(document.location)).searchParams;
 
@@ -160,61 +243,106 @@ return view.extend({
 			'.cbi-tab, .cbi-tab-disabled { padding: 4px 6px; cursor: pointer; user-select: none }'
 		]);
 
-		const title = E('h2', { 'name': 'content' }, _('Torrents'));
-
-		const table = E('table', { 'class': 'table', 'data-sort': params.get('sort') || 'name-asc' }, [
-			E('tr', { 'class': 'tr table-titles' }, [
-				E('th', { 'class': 'th shrink', 'data-key': 'icon' }),
-				E('th', { 'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
-					  'title': 'Sort by name',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Name')]),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'size',
-					  'title': 'Sort by size', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Size')]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'done',
-					  'title': 'Sort by download percentage', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Done')]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'status',
-					  'title': 'Sort by status', 'data-order': 'asc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Status')]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'seeder',
-					  'title': 'Sort by seeder count', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9660;'),
-				E('th', { 'class': 'th shrink center', 'data-key': 'leecher',
-					  'title': 'Sort by leecher count', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, '&#9650;'),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'download',
-					  'title': 'Sort by download speed', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Download')]),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'upload',
-					  'title': 'Sort by upload speed', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Upload')]),
-				E('th', { 'class': 'th shrink center', 'data-key': 'ratio',
-					  'title': 'Sort by download/upload ratio', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('Ratio')]),
-				E('th', { 'class': 'th shrink center nowrap', 'data-key': 'eta',
-					  'title': 'Sort by Estimated Time of Arrival', 'data-order': 'desc',
-					  'click': ev => tools.changeSorting(ev.target, sort) }, [_('ETA')]),
-				E('th', { 'data-key': 'check', 'class': 'th shrink center' })
-			])
-		]);
+		const title = E('h2', { 'name': 'content' }, _('Torrent List'));
 
 		const tabs = E('ul', { 'class': 'cbi-tabmenu', 'data-filter': params.get('tab') || 'all' });
 
-		poll.add(() => tools.rtorrentMulticall('d.', '', 'default',
-			'hash', 'name', 'hashing', 'state', 'is_active', 'complete',
-			'size_bytes', 'bytes_done', 'size_chunks', 'wanted_chunks', 'completed_chunks', 'chunk_size',
-			'peers_accounted', 'peers_complete', 'down.rate', 'up.rate', 'ratio', 'up.total',
-			'timestamp.started', 'timestamp.finished', 'custom1', 'custom=icon')
-			.then(data => {
-				tools.updateTable(table,
-					tools.computeValues(data, compute),
-					tools.formatValues(data, format), _('No torrents added yet.'));
-				tools.updateTabs(table, data, tabs, total, format);
-				tools.sortTable(table, sort);
-			}), 10);
+		const table = E('table', { 'class': 'table', 'data-sort': params.get('sort') || 'name-asc' }, [
+			E('tr', { 'class': 'tr table-titles' }, [
+				E('th', {
+					'class': 'th shrink', 'data-key': 'icon' }),
+				E('th', {
+					'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
+					'title': 'Sort by name',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Name')]),
+				E('th', {
+					'class': 'th shrink center nowrap', 'data-key': 'size',
+					'title': 'Sort by size', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Size')]),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'done',
+					'title': 'Sort by download percentage', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Done')]),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'status',
+					'title': 'Sort by status', 'data-order': 'asc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Status')]),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'seeder',
+					'title': 'Sort by seeder count', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, '&#9660;'),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'leecher',
+					'title': 'Sort by leecher count', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, '&#9650;'),
+				E('th', {
+					'class': 'th shrink center nowrap', 'data-key': 'download',
+					'title': 'Sort by download speed', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Download')]),
+				E('th', {
+					'class': 'th shrink center nowrap', 'data-key': 'upload',
+					'title': 'Sort by upload speed', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Upload')]),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'ratio',
+					'title': 'Sort by download/upload ratio', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Ratio')]),
+				E('th', {
+					'class': 'th shrink center nowrap', 'data-key': 'eta',
+					'title': 'Sort by Estimated Time of Arrival', 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort) }, [_('ETA')]),
+				E('th', {
+					'class': 'th shrink center', 'data-key': 'checked' })
+			])
+		]);
 
-		return E([], [style, title, tabs, table]);
+		const actionsComboButton = new ui.ComboButton('start', {
+			'start': _('Start'),
+			'pause': _('Pause'),
+			'stop': _('Stop'),
+			'hash': _('Check hash'),
+			'remove': _('Remove'),
+			'purge': _('Remove and delete from disk')
+		}, {
+			'name': 'cbi.action',
+			'sort': ['start', 'pause', 'stop', 'hash', 'remove', 'purge'],
+			'classes': {
+				'start': 'btn cbi-button important cbi-button-save',
+				'pause': 'btn cbi-button important cbi-button-apply',
+				'stop': 'btn cbi-button important cbi-button-apply',
+				'hash': 'btn cbi-button important cbi-button-apply',
+				'remove': 'btn cbi-button important cbi-button-negative',
+				'purge': 'btn cbi-button important cbi-button-negative'
+			},
+			'click': (ev, choice) => {
+				const checked = Array.from(table.querySelectorAll(
+					'.tr[data-key]:not(.hidden) input[type=checkbox].action:checked'))
+						.map(cb => cb.closest('tr').dataset.key);
+				if (checked.length == 0) {
+					alert(_('No torrent selected!') + '\n'
+						+ _('Please use the checkbox at the end of the torrents.'));
+				} else {
+					action[choice](checked).then(() => {
+						this.update(tabs, table);
+						actionsComboButton.setValue('start');
+					});
+				}
+			}
+		});
+		const actions = E('div', { 'class': 'cbi-page-actions' }, [actionsComboButton.render(), ' ',
+			E('input', {
+				'class': 'cbi-button cbi-button-reset', 'type': 'reset', 'value': _('Reset'),
+				'click': ev => {
+					table.querySelectorAll('input[type=checkbox].action')
+						.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+					actionsComboButton.setValue('start');
+				}
+			})
+		]);
+
+		poll.add(() => this.update(tabs, table), 10);
+
+		return E([], [style, title, tabs, table, actions]);
 	},
 	'handleSaveApply': null,
 	'handleSave': null,

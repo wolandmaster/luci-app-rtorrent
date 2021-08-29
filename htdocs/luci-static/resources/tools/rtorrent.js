@@ -109,20 +109,19 @@ function decodeXmlRpc(xml) {
 		case 'array':
 			return decodeXmlRpc(xml.firstElementChild);
 		case 'data':
-			let array = [];
+			const array = [];
 			for (let i = 0, size = xml.childElementCount; i < size; i++) {
 				array.push(decodeXmlRpc(xml.children[i]));
 			}
 			return array;
 		case 'struct':
-			let object = {};
+			const object = {};
 			for (let i = 0, size = xml.childElementCount; i < size; i++) {
 				Object.assign(object, decodeXmlRpc(xml.children[i]));
 			}
 			return object;
 		case 'member':
-			return { [xml.querySelector('name').textContent]:
-				decodeXmlRpc(xml.querySelector('value')) };
+			return { [xml.querySelector('name').textContent]: decodeXmlRpc(xml.querySelector('value')) };
 		case 'base64':
 			return atob(xml.textContent);
 		default:
@@ -147,8 +146,9 @@ function capitalize(str) {
 }
 
 return baseclass.extend({
+	// Executes a single rTorrent XMLRPC call.
 	'rtorrentCall': async function(method, ...params) {
-		let response = await rtorrentRpc(encodeXmlRpc(method, params));
+		const response = await rtorrentRpc(encodeXmlRpc(method, params));
 		if ('error' in response) {
 			// TODO
 			return [[]];
@@ -156,30 +156,38 @@ return baseclass.extend({
 			return decodeXmlRpc(domParser.parseFromString(response.xml, 'text/xml').documentElement);
 		}
 	},
+	// Iterates over all items in view and calls the given commands on each.
 	'rtorrentMulticall': async function(methodType, hash, filter, ...commands) {
 		const method = (methodType === 'd.') ? 'd.multicall2' : methodType + 'multicall';
 		const completeCommands = commands.map(cmd => methodType + cmd + (cmd.includes('=') ? '' : '='));
-		const results = await this.rtorrentCall(method, hash, filter, ...completeCommands);
-		return results.map(result => {
-			let object = {};
-			commands.forEach((key, i) => object[toCamelCase(key)] = result[i]);
+		const response = await this.rtorrentCall(method, hash, filter, ...completeCommands);
+		return response.map(result => {
+			const object = {};
+			commands.forEach((cmd, i) => object[toCamelCase(cmd)] = result[i]);
 			return object;
 		});
 	},
-	'rtorrentBatchcall': async function(methodType, hash, ...commands) {
-		let methods = [];
-		commands.forEach(cmd => {
-			let params = [hash];
+	// Allows multiple commands to be sent in one XMLRPC request.
+	'rtorrentBatchcall': async function(...commands) {
+		const methods = [];
+		commands.flat().forEach(cmd => {
+			const params = [];
 			if (cmd.includes('=')) {
 				params.push(...cmd.split('=')[1].split(','));
 			}
-			methods.push({ methodName: methodType + cmd.split('=')[0], params });
+			methods.push({ methodName: cmd.split('=')[0], params });
 		});
-		const results = await this.rtorrentCall('system.multicall', methods);
-		let object = {};
-		results.forEach((result, i) => object[toCamelCase(commands[i])]
-			= (result.length === 1) ? result[0] : result);
-		return object;
+		const response = (methods.length > 0) ? await this.rtorrentCall('system.multicall', methods) : [];
+		const buildResult = function(cmdGroup) {
+			const object = {};
+			cmdGroup.forEach(cmd => {
+				const result = response.shift();
+				object[toCamelCase(cmd.split(/[.=]/)[1])] = (result.length === 1) ? result[0] : result;
+			});
+			return object;
+		};
+		return commands.length > 0 && Array.isArray(commands[0])
+			? commands.map(buildResult) : buildResult(commands);
 	},
 	'computeValues': function(data, compute) {
 		data.forEach((row, index) => {
