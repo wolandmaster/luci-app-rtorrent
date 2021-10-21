@@ -6,14 +6,18 @@
 'require poll';
 'require ui';
 'require tools.rtorrent as tools';
+'require view.rtorrent.general as general';
+'require view.rtorrent.files as files';
+
+const tabViews = [general, files];
 
 const compute = new Map([[
 	'key', function(key, row) { return row.hash; }], [
 	'icon', function(key, row) { return row.customIcon; }], [
 	'size', function(key, row) { return row.sizeBytes; }], [
-	'expectedChunks', function(key, row) { return row.wantedChunks + row.completedChunks }], [
+	'expectedChunks', function(key, row) { return row.wantedChunks + row.completedChunks; }], [
 	'done', function(key, row) {
-		if (row.expectedChunks == row.sizeChunks) {
+		if (row.expectedChunks === row.sizeChunks) {
 			return 100 * row.bytesDone / row.sizeBytes;
 		} else {
 			return Math.min(100 * row.completedChunks / row.expectedChunks, 100);
@@ -21,11 +25,11 @@ const compute = new Map([[
 	}], [
 	'status', function(key, row) {
 		// 1: down, 2: stop, 3: pause, 4: hash, 5: seed
-		if (row.hashing > 0) { return 4; }
-		else if (row.state == 0) { return 2; }
-		else if (row.isActive == 0) { return 3; }
-		else if (row.wantedChunks > 0) { return 1; }
-		else { return 5; }
+		if (row.hashing > 0) return 4;
+		else if (row.state === 0) return 2;
+		else if (row.isActive === 0) return 3;
+		else if (row.wantedChunks > 0) return 1;
+		else return 5;
 	}], [
 	'seeder', function(key, row) { return row.peersComplete; }], [
 	'leecher', function(key, row) { return row.peersAccounted; }], [
@@ -33,10 +37,10 @@ const compute = new Map([[
 	'upload', function(key, row) { return row.upRate; }], [
 	'eta', function(key, row) {
 		// 0: already done, Infinity: infinite
-		if (row.wantedChunks == 0) {
+		if (row.wantedChunks === 0) {
 			return 0;
 		} else if (row.downRate > 0) {
-			if (row.expectedChunks == row.sizeChunks) {
+			if (row.expectedChunks === row.sizeChunks) {
 				return (row.sizeBytes - row.bytesDone) / row.downRate;
 			} else {
 				return row.wantedChunks * row.chunkSize / row.downRate;
@@ -46,39 +50,37 @@ const compute = new Map([[
 		}
 	}], [
 	'checked', function() { return 0; }], [
-	'tags', function(key, row) {
-		return 'all ' + (row.wantedChunks > 0 ? 'incomplete ' : '') + row.custom1;
-	}]
+	'tags', function(key, row) { return 'all ' + (row.wantedChunks > 0 ? 'incomplete ' : '') + row.custom1; }]
 ]);
 
 const format = {
 	'icon': function(value) {
 		return E('img', {
 			'src': L.resource('icons/loading.gif'), 'data-src': value,
-			'onerror': "this.src='" + L.resource('icons/unknown_tracker.svg') + "'",
+			'onerror': 'this.src=\'' + L.resource('icons/unknown_tracker.svg') + '\'',
 			'width': '16', 'height': '16', 'title': tools.getDomain(value)
 		});
 	},
-	'name': function(value, key) {
-		// if (key) {
-		// TODO: add link
-		// } else {
-		return value;
-		// }
+	'name': function(value, key, row) {
+		if (key) {
+			return E('div', {
+				'class': 'link', 'click': () => ui.showModal(null, general.render(row.hash,
+					tools.buildTorrentTabs(row.hash, general.name, tabViews)))
+			}, value);
+		} else {
+			return value;
+		}
 	},
-	'size': function(value) {
-		return E('div', { 'title': value + ' B' }, [tools.humanSize(value)]);
-	},
+	'size': function(value) { return E('div', { 'title': value + ' B' }, [tools.humanSize(value)]); },
 	'done': function(value) { return value.toFixed(1) + '%'; },
 	'status': function(value) {
-		switch (value) {
-			case 1: return E('div', { 'class': 'green' }, _('down'));
-			case 2: return E('div', { 'class': 'red' }, _('stop'));
-			case 3: return E('div', { 'class': 'orange' }, _('pause'));
-			case 4: return E('div', { 'class': 'green' }, _('hash'));
-			case 5: return E('div', { 'class': 'blue' }, _('seed'));
-			default: return E('div', {}, _('unknown'));
-		}
+		return {
+			1: E('div', { 'class': 'green' }, _('down')),
+			2: E('div', { 'class': 'red' }, _('stop')),
+			3: E('div', { 'class': 'orange' }, _('pause')),
+			4: E('div', { 'class': 'green' }, _('hash')),
+			5: E('div', { 'class': 'blue' }, _('seed'))
+		}[value] || E('div', {}, _('unknown'));
 	},
 	'ratio': function(value, key, row) {
 		return E('div', {
@@ -89,20 +91,20 @@ const format = {
 	'download': function(value) { return tools.humanSpeed(value); },
 	'upload': function(value) { return tools.humanSpeed(value); },
 	'eta': function(value, key, row) {
-		const downloadStarted = (row.timestampStarted != 0)
+		const downloadStarted = (row.timestampStarted !== 0)
 			? tools.humanDate(row.timestampStarted) : _('not yet started');
-		const downloadFinished = (row.timestampFinished != 0)
+		const downloadFinished = (row.timestampFinished !== 0)
 			? tools.humanDate(row.timestampFinished) : _('not yet finished');
-		const text = (value == 0) ? '--' : (value == Infinity) ? '&#8734;' : tools.humanTime(value);
+		const text = (value === 0) ? '--' : (value === Infinity) ? '&#8734;' : tools.humanTime(value);
 		return E('div', {
 			'title': _('Download started') + ': ' + downloadStarted + '\n'
 				+ _('Download finished') + ': ' + downloadFinished,
-			'class': (value == Infinity || text === '&#8734;') ? 'red' : null
+			'class': (value === Infinity || text === '&#8734;') ? 'red' : null
 		}, text);
 	},
-	'checked': function(value, key, row, index, data) {
+	'checked': function(value) {
 		return E('input', {
-			'class': 'action', 'type': 'checkbox', 'checked': (value == 1) ? 'checked' : null,
+			'class': 'action', 'type': 'checkbox', 'checked': (value === 1) ? 'checked' : null,
 			'change': ev => tools.updateCheckbox(ev.target)
 		});
 	}
@@ -133,11 +135,11 @@ const sort = {
 
 const total = {
 	'name': function(key, data) {
-		return _('TOTAL') + ': ' + data.reduce(count => count += 1, 0) + ' ' + _('pcs.');
+		return _('TOTAL') + ': ' + data.reduce(count => count + 1, 0) + ' ' + _('pcs.');
 	},
-	'size':	function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
-	'download': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
-	'upload': function(key, data) { return data.reduce((sum, row) => sum += row[key], 0); },
+	'size': function(key, data) { return data.reduce((sum, row) => sum + row[key], 0); },
+	'download': function(key, data) { return data.reduce((sum, row) => sum + row[key], 0); },
+	'upload': function(key, data) { return data.reduce((sum, row) => sum + row[key], 0); },
 	'checked': function() { return 0; }
 };
 
@@ -146,16 +148,16 @@ const action = {
 		return tools.rtorrentBatchcall(...keys.map(hash => [
 			'd.state=' + hash, 'd.is_active=' + hash
 		])).then(statuses => tools.rtorrentBatchcall(...keys.reduce((commands, hash, i) => {
-			if (statuses[i].state == 0) {
+			if (statuses[i].state === 0) {
 				commands.push(['d.name=' + hash, 'd.start=' + hash]);
-			} else if (statuses[i].isActive == 0) {
+			} else if (statuses[i].isActive === 0) {
 				commands.push(['d.name=' + hash, 'd.resume=' + hash]);
 			}
 			return commands;
 		}, [[]]))).then(results => results.forEach(result => {
-			if (result.start == 0) {
+			if (result.start === 0) {
 				ui.addNotification(null, '<p>' + _('Started') + ' <i>' + result.name + '</i></p>');
-			} else if (result.resume == 0) {
+			} else if (result.resume === 0) {
 				ui.addNotification(null, '<p>' + _('Resumed') + ' <i>' + result.name + '</i></p>');
 			}
 		}));
@@ -165,7 +167,7 @@ const action = {
 			'd.name=' + hash, 'd.state=' + hash, 'd.is_active=' + hash,
 			'd.start=' + hash, 'd.pause=' + hash
 		])).then(results => results.forEach(result => {
-			if ((result.state == 0 || result.isActive == 1) && result.start == 0 && result.pause == 0) {
+			if ((result.state === 0 || result.isActive === 1) && result.start === 0 && result.pause === 0) {
 				ui.addNotification(null, '<p>' + _('Paused') + ' <i>' + result.name + '</i></p>');
 			}
 		}));
@@ -174,7 +176,7 @@ const action = {
 		return tools.rtorrentBatchcall([], ...keys.map(hash => [
 			'd.name=' + hash, 'd.state=' + hash, 'd.stop=' + hash, 'd.close=' + hash
 		])).then(results => results.forEach(result => {
-			if (result.state == 1 && result.stop == 0 && result.close == 0) {
+			if (result.state === 1 && result.stop === 0 && result.close === 0) {
 				ui.addNotification(null, '<p>' + _('Stopped') + ' <i>' + result.name + '</i></p>');
 			}
 		}));
@@ -183,7 +185,7 @@ const action = {
 		return tools.rtorrentBatchcall([], ...keys.map(hash => [
 			'd.name=' + hash, 'd.check_hash=' + hash
 		])).then(results => results.forEach(result => {
-			if (result.checkHash == 0) {
+			if (result.checkHash === 0) {
 				ui.addNotification(null, '<p>' + _('Checking hashes of')
 					+ ' <i>' + result.name + '</i></p>');
 			}
@@ -193,7 +195,7 @@ const action = {
 		return tools.rtorrentBatchcall([], ...keys.map(hash => [
 			'd.name=' + hash, 'd.close=' + hash, 'd.erase=' + hash
 		])).then(results => results.forEach(result => {
-			if (result.close == 0 && result.erase == 0) {
+			if (result.close === 0 && result.erase === 0) {
 				ui.addNotification(null, '<p>' + _('Removed') + ' <i>' + result.name + '</i></p>');
 			}
 		}));
@@ -202,7 +204,7 @@ const action = {
 		return tools.rtorrentBatchcall([], ...keys.map(hash => [
 			'd.name=' + hash, 'd.custom5.set=' + hash + ',1', 'd.close=' + hash, 'd.erase=' + hash
 		])).then(results => results.forEach(result => {
-			if (result.close == 0 && result.erase == 0) {
+			if (result.close === 0 && result.erase === 0) {
 				ui.addNotification(null, '<p>' + _('Erased') + ' <i>' + result.name + '</i></p>');
 			}
 		}));
@@ -222,10 +224,11 @@ return view.extend({
 					tools.formatValues(data, format), _('No torrents added yet.'));
 				tools.updateTabs(table, data, tabs, total, format);
 				tools.sortTable(table, sort);
+				tools.updateRowStyle(table);
 			});
 	},
 	'render': function() {
-		const params = (new URL(document.location)).searchParams;
+		const params = tools.getParams('torrents');
 
 		const style = E('style', { 'type': 'text/css' }, [
 			'.shrink { width: 1% }',
@@ -240,7 +243,9 @@ return view.extend({
 			'.table .th, .table .td { padding: 10px 6px 9px }',
 			'.th:not(:empty) { cursor: pointer }',
 			'.tr.table-total .td { font-weight: bold }',
-			'.cbi-tab, .cbi-tab-disabled { padding: 4px 6px; cursor: pointer; user-select: none }'
+			'.cbi-tab, .cbi-tab-disabled { padding: 4px 6px; cursor: pointer; user-select: none }',
+			'.modal { max-width: 900px !important }',
+			'div.link:hover { cursor: pointer; color: #0069d6 }'
 		]);
 
 		const title = E('h2', { 'name': 'content' }, _('Torrent List'));
@@ -249,50 +254,60 @@ return view.extend({
 
 		const table = E('table', { 'class': 'table', 'data-sort': params.get('sort') || 'name-asc' }, [
 			E('tr', { 'class': 'tr table-titles' }, [
-				E('th', {
-					'class': 'th shrink', 'data-key': 'icon' }),
+				E('th', { 'class': 'th shrink', 'data-key': 'icon' }),
 				E('th', {
 					'class': 'th wrap active', 'data-key': 'name', 'data-order': 'asc',
-					'title': 'Sort by name',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Name')]),
+					'title': _('Sort by name'),
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Name')),
 				E('th', {
 					'class': 'th shrink center nowrap', 'data-key': 'size',
-					'title': 'Sort by size', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Size')]),
+					'title': _('Sort by size'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Size')),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'done',
-					'title': 'Sort by download percentage', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Done')]),
+					'title': _('Sort by download percentage'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Done')),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'status',
-					'title': 'Sort by status', 'data-order': 'asc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Status')]),
+					'title': _('Sort by status'), 'data-order': 'asc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Status')),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'seeder',
-					'title': 'Sort by seeder count', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, '&#9660;'),
+					'title': _('Sort by seeder count'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, '&#9660;'),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'leecher',
-					'title': 'Sort by leecher count', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, '&#9650;'),
+					'title': _('Sort by leecher count'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, '&#9650;'),
 				E('th', {
 					'class': 'th shrink center nowrap', 'data-key': 'download',
-					'title': 'Sort by download speed', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Download')]),
+					'title': _('Sort by download speed'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Download')),
 				E('th', {
 					'class': 'th shrink center nowrap', 'data-key': 'upload',
-					'title': 'Sort by upload speed', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Upload')]),
+					'title': _('Sort by upload speed'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Upload')),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'ratio',
-					'title': 'Sort by download/upload ratio', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('Ratio')]),
+					'title': _('Sort by download/upload ratio'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Ratio')),
 				E('th', {
 					'class': 'th shrink center nowrap', 'data-key': 'eta',
-					'title': 'Sort by Estimated Time of Arrival', 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort) }, [_('ETA')]),
+					'title': _('Sort by Estimated Time of Arrival'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('ETA')),
 				E('th', {
-					'class': 'th shrink center', 'data-key': 'checked' })
+					'class': 'th shrink center', 'data-key': 'checked'
+				})
 			])
 		]);
 
@@ -317,8 +332,8 @@ return view.extend({
 			'click': (ev, choice) => {
 				const checked = Array.from(table.querySelectorAll(
 					'.tr[data-key]:not(.hidden) input[type=checkbox].action:checked'))
-						.map(cb => cb.closest('tr').dataset.key);
-				if (checked.length == 0) {
+					.map(cb => cb.closest('.tr').dataset.key);
+				if (checked.length === 0) {
 					alert(_('No torrent selected!') + '\n'
 						+ _('Please use the checkbox at the end of the torrents.'));
 				} else {
@@ -332,15 +347,23 @@ return view.extend({
 		const actions = E('div', { 'class': 'cbi-page-actions' }, [actionsComboButton.render(), ' ',
 			E('input', {
 				'class': 'cbi-button cbi-button-reset', 'type': 'reset', 'value': _('Reset'),
-				'click': ev => {
+				'click': () => {
 					table.querySelectorAll('input[type=checkbox].action')
-						.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
+						.forEach(cb => {
+							cb.checked = false;
+							cb.indeterminate = false;
+						});
 					actionsComboButton.setValue('start');
 				}
 			})
 		]);
 
 		poll.add(() => this.update(tabs, table), 10);
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') {
+				tabViews.forEach(view => view.dismiss());
+			}
+		});
 
 		return E([], [style, title, tabs, table, actions]);
 	},

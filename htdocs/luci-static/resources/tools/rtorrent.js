@@ -3,6 +3,7 @@
 
 'use strict';
 'require baseclass';
+'require ui';
 'require rpc';
 
 const domParser = new DOMParser();
@@ -13,61 +14,41 @@ const rtorrentRpc = rpc.declare({
 });
 
 Element.prototype.insertChildAtIndex = function(index, child) {
-	if (index >= this.children.length) {
-		return this.appendChild(child);
-	} else {
-		return this.insertBefore(child, this.children[index]);
-	}
-}
+	if (index >= this.children.length) return this.appendChild(child);
+	else return this.insertBefore(child, this.children[index]);
+};
 
 function escapeXml(str) {
 	return str.replace(/[<>&'"]/g, function(chr) {
-		switch (chr) {
-			case '<': return '&lt;';
-			case '>': return '&gt;';
-			case '&': return '&amp;';
-			case "'": return '&apos;';
-			case '"': return '&quot;';
-		}
+		if (chr === '<') return '&lt;';
+		else if (chr === '>') return '&gt;';
+		else if (chr === '&') return '&amp;';
+		else if (chr === '\'') return '&apos;';
+		else if (chr === '"') return '&quot;';
 	});
 }
 
 function encodeXmlRpcParam(param) {
-	switch (typeof(param)) {
+	switch (typeof (param)) {
 		case 'string':
 			return '<string>' + escapeXml(param) + '</string>';
 		case 'boolean':
 			return '<boolean>' + param + '<boolean>';
 		case 'number':
-			if (Number.isInteger(param)) {
-				return '<int>' + param + '</int>';
-			} else {
-				return '<double>' + param + '</double>';
-			}
+			if (Number.isInteger(param)) return '<int>' + param + '</int>';
+			else return '<double>' + param + '</double>';
 		case 'object':
 			if (param instanceof Date) {
 				return '<dateTime.iso8601>' + param.toISOString() + '</dateTime.iso8601>';
 			} else if (Array.isArray(param)) {
-				let xml = '<array>'
-					+   '<data>'
-					+ param.map(element => ''
-					+     '<value>'
-					+ encodeXmlRpcParam(element)
-					+     '</value>').join('')
-					+   '</data>'
-					+ '</array>';
-				return xml;
+				const values = param.map(v => '<value>' + encodeXmlRpcParam(v) + '</value>').join('');
+				return `<array><data>${values}</data></array>`;
 			} else {
-				let xml = '<struct>'
-					+ Object.entries(param).map(([key, value]) => ''
-					+   '<member>'
-					+     '<name>' + escapeXml(key) + '</name>'
-					+     '<value>'
-					+ encodeXmlRpcParam(value)
-					+     '</value>'
-					+   '</member>').join('')
-					+ '</struct>';
-				return xml;
+				const members = Object.entries(param).map(([key, value]) => '<member>'
+					+ '<name>' + escapeXml(key) + '</name>'
+					+ '<value>' + encodeXmlRpcParam(value) + '</value>'
+					+ '</member>').join('');
+				return `<struct>${members}</struct>`;
 			}
 		default:
 			return '<base64>' + btoa(param) + '</base64>';
@@ -75,19 +56,13 @@ function encodeXmlRpcParam(param) {
 }
 
 function encodeXmlRpc(method, params) {
-	let xml = '<?xml version="1.0"?>'
+	return '<?xml version="1.0"?>'
 		+ '<methodCall>'
-		+   '<methodName>' + method + '</methodName>'
-		+   '<params>'
-		+ params.map(param => ''
-		+     '<param>'
-		+       '<value>'
-		+ encodeXmlRpcParam(param)
-		+       '</value>'
-		+     '</param>').join('')
-		+   '</params>'
+		+ '<methodName>' + method + '</methodName>'
+		+ '<params>' + params.map(param => '<param>'
+			+ '<value>' + encodeXmlRpcParam(param) + '</value>'
+			+ '</param>').join('') + '</params>'
 		+ '</methodCall>';
-	return xml;
 }
 
 function decodeXmlRpc(xml) {
@@ -148,9 +123,11 @@ function capitalize(str) {
 return baseclass.extend({
 	// Executes a single rTorrent XMLRPC call.
 	'rtorrentCall': async function(method, ...params) {
+		// console.log('xml', encodeXmlRpc(method, params));
 		const response = await rtorrentRpc(encodeXmlRpc(method, params));
 		if ('error' in response) {
 			// TODO
+			console.log('xml-rpc error', response);
 			return [[]];
 		} else {
 			return decodeXmlRpc(domParser.parseFromString(response.xml, 'text/xml').documentElement);
@@ -182,7 +159,8 @@ return baseclass.extend({
 			const object = {};
 			cmdGroup.forEach(cmd => {
 				const result = response.shift();
-				object[toCamelCase(cmd.split(/[.=]/)[1])] = (result.length === 1) ? result[0] : result;
+				object[toCamelCase(cmd.replace(/=\w{40}/, '').match(/^\w\.(.*)/)[1])] =
+					(result.length === 1) ? result[0] : result;
 			});
 			return object;
 		};
@@ -215,20 +193,24 @@ return baseclass.extend({
 				row = table.appendChild(E('tr', { 'class': 'tr', 'data-key': dataRow.key }));
 				titles.forEach(th => {
 					const td = row.appendChild(E('td', {
-						'class': th.className, 'data-key': th.dataset.key,
+						'class': th.className, 'data-key': th.dataset.key
 					}));
 					td.classList.replace('th', 'td');
 					td.classList.remove('active');
 				});
 			}
-			row.dataset.tags = dataRow.tags;
+			if (dataRow.tags) {
+				row.dataset.tags = dataRow.tags;
+			}
 			titles.filter(title => title.dataset.key).forEach(title => {
 				const td = row.querySelector(`.td[data-key = "${title.dataset.key}"]`);
-				if (td.dataset.raw != dataRow[title.dataset.key]) {
+				if (String(td.dataset.raw) !== String(dataRow[title.dataset.key])) {
 					td.dataset.raw = dataRow[title.dataset.key];
 					const content = formattedData[rowIndex][title.dataset.key];
 					if (isElem(content)) {
-						while (td.firstChild) { td.removeChild(td.firstChild); }
+						while (td.firstChild) {
+							td.removeChild(td.firstChild);
+						}
 						td.appendChild(content);
 					} else {
 						td.innerHTML = content;
@@ -239,7 +221,8 @@ return baseclass.extend({
 		});
 		rows.forEach(deletedRow => table.removeChild(deletedRow));
 		table.querySelectorAll('img[data-src]').forEach(img => {
-			img.setAttribute('src', img.dataset.src); img.removeAttribute('data-src');
+			img.setAttribute('src', img.dataset.src);
+			img.removeAttribute('data-src');
 		});
 		if (placeholder && table.firstElementChild === table.lastElementChild) {
 			const row = table.appendChild(E('tr', { 'class': 'tr placeholder' }));
@@ -250,7 +233,7 @@ return baseclass.extend({
 		const currentActive = table.querySelector('.th.active');
 		if (!currentActive || !table.dataset.sort.startsWith(currentActive.dataset.key + '-')) {
 			table.querySelectorAll('.th').forEach(th => th.classList.remove('active'));
-			const [key, order] = table.dataset.sort.split('-');
+			const key = table.dataset.sort.split('-')[0];
 			table.querySelector(`.th[data-key="${key}"]`).classList.add('active');
 		}
 		Array.from(table.querySelectorAll('.tr[data-key]')).sort(function(leftRow, rightRow) {
@@ -258,37 +241,47 @@ return baseclass.extend({
 				const [key, order] = sortBy.split('-');
 				let leftValue = leftRow.querySelector(`.td[data-key="${key}"]`).dataset.raw;
 				let rightValue = rightRow.querySelector(`.td[data-key="${key}"]`).dataset.raw;
-				if (order == 'desc') { [leftValue, rightValue] = [rightValue, leftValue]; }
+				if (order === 'desc') [leftValue, rightValue] = [rightValue, leftValue];
 				const compare = (!isNaN(leftValue) && !isNaN(rightValue))
 					? leftValue - rightValue : leftValue.toString().localeCompare(rightValue);
-				if (compare != 0) { return compare; }
+				if (compare !== 0) {
+					return compare;
+				}
 			}
 			return 0;
 		}).forEach(tr => table.appendChild(tr));
 		const totalRow = table.querySelector('.tr.table-total');
-		if (totalRow) { table.appendChild(totalRow); }
+		if (totalRow) {
+			table.appendChild(totalRow);
+		}
 	},
 	'changeSorting': function(th, sort) {
 		const table = th.closest('table');
 		const [key, order] = table.dataset.sort.split('-');
-		if (th.dataset.key == key) {
+		if (th.dataset.key === key) {
 			th.dataset.order = order;
-			th.dataset.order = (th.dataset.order == 'asc') ? 'desc' : 'asc';
+			th.dataset.order = (th.dataset.order === 'asc') ? 'desc' : 'asc';
 		}
 		table.dataset.sort = th.dataset.key + '-' + th.dataset.order;
 		this.sortTable(table, sort);
 		const url = new URL(window.location);
 		url.searchParams.set('sort', table.dataset.sort);
 		history.replaceState({}, 'Sort by ' + table.dataset.sort, url);
+		this.updateRowStyle(table);
 	},
 	'updateTabs': function(table, data, tabs, total, format) {
 		const tags = data.map(row => row.tags.split(' ')).flat().filter(blank).sort();
-		if (tags.includes('incomplete')) { tags.splice(1, 0, 'incomplete'); }
+		if (tags.includes('incomplete')) {
+			tags.splice(1, 0, 'incomplete');
+		}
 		const getTagText = function(tag) {
 			switch (tag) {
-				case 'all': return _('All');
-				case 'incomplete': return _('Incomplete');
-				default: return capitalize(tag);
+				case 'all':
+					return _('All');
+				case 'incomplete':
+					return _('Incomplete');
+				default:
+					return capitalize(tag);
 			}
 		};
 		Array.from(tabs.querySelectorAll('li')).filter(li => !tags.includes(li.dataset.tab))
@@ -311,13 +304,19 @@ return baseclass.extend({
 		const currentTab = tabs.querySelector('li.cbi-tab');
 		if (currentTab !== tab) {
 			table.querySelectorAll('input[type=checkbox].action')
-				.forEach(cb => { cb.checked = false; cb.indeterminate = false; });
-			if (currentTab !== null ) { currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled'); }
+				.forEach(cb => {
+					cb.checked = false;
+					cb.indeterminate = false;
+				});
+			if (currentTab !== null) {
+				currentTab.classList.replace('cbi-tab', 'cbi-tab-disabled');
+			}
 			tab.classList.replace('cbi-tab-disabled', 'cbi-tab');
 			tabs.dataset.filter = tab.dataset.tab;
 			const url = new URL(window.location);
 			url.searchParams.set('tab', tabs.dataset.filter);
 			history.replaceState({}, 'Filter by ' + tabs.dataset.filter, url);
+			this.updateRowStyle(table);
 		}
 		table.querySelectorAll('.tr[data-key]').forEach(row => {
 			const rowHasTag = (' ' + row.dataset.tags + ' ').includes(' ' + tabs.dataset.filter + ' ');
@@ -331,13 +330,14 @@ return baseclass.extend({
 		const visibleData = data.filter(row => !row.hidden);
 		let totalRow = table.querySelector('.tr.table-total');
 		if (visibleData.length <= 1) {
-			if (totalRow) { table.removeChild(totalRow); }
+			if (totalRow) table.removeChild(totalRow);
 		} else {
 			if (!totalRow) {
 				totalRow = table.appendChild(E('tr', { 'class': 'tr table-total' }));
 				table.querySelectorAll('.tr.table-titles .th').forEach(th => {
 					const td = totalRow.appendChild(E('td', {
-						'class': th.className, 'data-key': th.dataset.key }));
+						'class': th.className, 'data-key': th.dataset.key
+					}));
 					td.classList.replace('th', 'td');
 					td.classList.remove('active');
 				});
@@ -345,11 +345,11 @@ return baseclass.extend({
 			Object.entries(total).forEach(([key, func]) => {
 				const td = totalRow.querySelector(`.td[data-key="${key}"]`);
 				const newValue = func(key, visibleData);
-				if (td.dataset.raw != newValue) {
+				if (td.dataset.raw !== newValue) {
 					td.dataset.raw = newValue;
 					const content = format[key](newValue);
 					if (isElem(content)) {
-						while (td.firstChild) { td.removeChild(td.firstChild); }
+						while (td.firstChild) td.removeChild(td.firstChild);
 						td.appendChild(content);
 					} else {
 						td.innerHTML = content;
@@ -365,18 +365,58 @@ return baseclass.extend({
 			const totalCheckbox = checkbox;
 			let count = 0, selected = 0;
 			table.querySelectorAll('.tr[data-key]:not(.hidden) input[type=checkbox].action')
-				.forEach(cb => { cb.checked = !cb.checked; count++; selected += cb.checked ? 1 : 0; });
+				.forEach(cb => {
+					cb.checked = !cb.checked;
+					count++;
+					selected += cb.checked ? 1 : 0;
+				});
 			totalCheckbox.indeterminate = (selected > 0 && selected < count);
 		} else {
 			const totalCheckbox = table.querySelector('.tr.table-total input[type=checkbox].action');
 			if (totalCheckbox) {
 				let count = 0, selected = 0;
 				table.querySelectorAll('.tr[data-key]:not(.hidden) input[type=checkbox].action')
-					.forEach(cb => { count++; selected += cb.checked ? 1 : 0; });
+					.forEach(cb => {
+						count++;
+						selected += cb.checked ? 1 : 0;
+					});
 				totalCheckbox.checked = (selected === count);
 				totalCheckbox.indeterminate = (selected > 0 && selected < count);
 			}
 		}
+	},
+	'updateRowStyle': function(table) {
+		table.querySelectorAll('.tr:not(.hidden)').forEach((row, i) => {
+			const oldRowStyle = 'cbi-rowstyle-' + (i % 2 === 0 ? '1' : '2');
+			const newRowStyle = 'cbi-rowstyle-' + (i % 2 === 0 ? '2' : '1');
+			if (!row.classList.replace(oldRowStyle, newRowStyle)) {
+				row.classList.add(newRowStyle);
+			}
+		});
+	},
+	'buildTorrentTabs': function(hash, tab, tabViews) {
+		return E('ul', { 'class': 'cbi-tabmenu' }, tabViews.map(tabView => E('li', {
+			'class': tab === tabView.name ? 'cbi-tab' : 'cbi-tab-disabled', 'click': () => {
+				if (tab !== tabView.name) {
+					tabViews.filter(view => view.name === tab).shift().dismiss();
+					ui.showModal(null, tabView.render(hash,
+						this.buildTorrentTabs(hash, tabView.name, tabViews)));
+				}
+			}
+		}, _(tabView.name))));
+	},
+	'updateTabLink': function(hash, title) {
+		document.getElementById('maincontent').prepend(title);
+		document.querySelectorAll('.tabs a').forEach(link => {
+			const url = new URL(link.href);
+			url.searchParams.set('hash', hash);
+			link.href = url.toString();
+		});
+	},
+	'resetInputs': function(table) {
+		table.querySelectorAll('input, textarea').forEach(element => {
+			element.value = this.urlDecode(element.parentNode.dataset.raw);
+		});
 	},
 	'humanSize': function(bytes) {
 		const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
@@ -398,16 +438,48 @@ return baseclass.extend({
 		if (time.getMonth() > 0) {
 			return '&#8734;';
 		} else if (time.getDate() > 1) {
-			return (time.getDate() - 1) + 'd<br>' + time.getHours() + 'h ' + time.getMinutes() + 'm';
+			return (time.getDate() - 1) + _('d') + '<br>'
+				+ time.getHours() + _('h') + ' ' + time.getMinutes() + _('m');
 		} else if (time.getHours() > 0) {
-			return time.getHours() + 'h<br>' + time.getMinutes() + 'm ' + time.getSeconds() + 's';
+			return time.getHours() + _('h') + '<br>'
+				+ time.getMinutes() + _('m') + ' ' + time.getSeconds() + _('s');
 		} else if (time.getMinutes() > 0) {
-			return time.getMinutes() + 'm ' + time.getSeconds() + 's';
+			return time.getMinutes() + _('m') + ' ' + time.getSeconds() + _('s');
 		} else {
-			return time.getSeconds() + 's';
+			return time.getSeconds() + _('s');
 		}
 	},
 	'getDomain': function(url) {
-		return url.match(/:\/\/[^/:]+/) ? new URL(url).hostname : url.split("/").pop().split(".")[0];
+		return url.match(/:\/\/[^/:]+/) ? new URL(url).hostname : url.split('/').pop().split('.')[0];
+	},
+	'urlEncode': function(url) {
+		return encodeURIComponent(url).replace(/'/g, '%27').replace(/"/g, '%22');
+	},
+	'urlDecode': function(encodedUrl) {
+		return decodeURIComponent(encodedUrl).replace(/\+/g, ' ');
+	},
+	'setCookie': function(name, value) {
+		document.cookie = name + '=' + this.urlEncode(value) + '; SameSite=Strict';
+	},
+	'getCookie': function(name) {
+		const cookie = document.cookie.split('; ').find(cookie => cookie.startsWith(name + '='));
+		return cookie ? this.urlDecode(cookie.split('=')[1]) : undefined;
+	},
+	'getParams': function(name) {
+		const tools = this;
+		window.onunload = function() {
+			const params = (new URL(document.location)).searchParams;
+			params.delete('hash');
+			if (params.toString()) {
+				tools.setCookie('rtorrent-' + name, params.toString());
+			}
+		};
+		const url = new URL(document.location);
+		const savedParams = this.getCookie('rtorrent-' + name);
+		if (savedParams) {
+			(new URLSearchParams(savedParams)).forEach((value, key) => url.searchParams.set(key, value));
+			history.replaceState({}, 'Load params', url.toString());
+		}
+		return url.searchParams;
 	}
 });
