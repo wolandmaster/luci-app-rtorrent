@@ -8,7 +8,7 @@
 'require tools.rtorrent as tools';
 
 return baseclass.extend({
-	'name': function() { return 'Files'; },
+	'name': function() { return 'Chunks'; },
 	'update': function(hash, title) {
 		if (title.textContent === tools.loadingText()) {
 			tools.rtorrentCall('d.name', hash).then(name => title.textContent = name);
