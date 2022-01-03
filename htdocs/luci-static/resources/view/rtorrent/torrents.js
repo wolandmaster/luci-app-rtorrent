@@ -1,4 +1,4 @@
-// Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
+// Copyright 2014-2022 Sandor Balazsi <sandor.balazsi@gmail.com>
 // This is free software, licensed under the Apache License, Version 2.0
 
 'use strict';
@@ -54,6 +54,7 @@ const compute = new Map([[
 			return Infinity;
 		}
 	}], [
+	'finished', function(key, torrent) { return torrent.timestampFinished; }], [
 	'checked', function() { return 0; }], [
 	'tags', function(key, torrent) {
 		return 'all ' + ((torrent.wantedChunks > 0) ? 'incomplete ' : '') + torrent.custom1;
@@ -107,6 +108,9 @@ const format = {
 			'class': (value === Infinity || text === '&#8734;') ? 'red' : null
 		}, text);
 	},
+	'finished': function(value, key, row) {
+		return (row.timestampFinished !== 0) ? tools.humanDate(row.timestampFinished) : _('not yet finished');
+	},
 	'checked': function(value) {
 		return E('input', {
 			'class': 'action', 'type': 'checkbox', 'checked': (value === 1) ? 'checked' : null,
@@ -134,8 +138,10 @@ const sort = {
 	'upload-desc': ['upload-desc', 'download-desc', 'name-asc'],
 	'ratio-asc': ['ratio-asc', 'name-asc'],
 	'ratio-desc': ['ratio-desc', 'name-asc'],
-	'eta-asc': ['eta-asc', 'name-asc'],
-	'eta-desc': ['eta-desc', 'name-asc']
+	'eta-asc': ['eta-asc', 'finished-asc', 'name-asc'],
+	'eta-desc': ['eta-desc', 'finished-desc', 'name-asc'],
+	'finished-asc': ['finished-asc', 'name-asc'],
+	'finished-desc': ['finished-desc', 'name-asc']
 };
 
 const total = {
@@ -250,7 +256,7 @@ return view.extend({
 			'.blue { color: #0000bf }',
 			'.active { color: #0069d6 }',
 			'.faulty { color: #ff0000 }',
-			'.hidden { display: none }',
+			'.hidden { display: none !important }',
 			'.table .th, .table .td { padding: 10px 6px 9px }',
 			'.th:not(:empty) { cursor: pointer;  user-select: none }',
 			'.tr.table-total .td { font-weight: bold }',
@@ -319,9 +325,14 @@ return view.extend({
 				}, _('Ratio')),
 				E('th', {
 					'class': 'th shrink center nowrap', 'data-key': 'eta',
-					'title': _('Sort by Estimated Time of Arrival'), 'data-order': 'desc',
-					'click': ev => tools.changeSorting(ev.target, sort)
+					'title': _('Sort by estimated time of arrival\nor download finished time'),
+					'data-order': 'desc', 'click': ev => tools.changeSorting(ev.target, sort)
 				}, _('ETA')),
+				E('th', {
+					'class': 'hidden th shrink center nowrap', 'data-key': 'finished',
+					'title': _('Sort by download finished time'), 'data-order': 'desc',
+					'click': ev => tools.changeSorting(ev.target, sort)
+				}, _('Finished')),
 				E('th', {
 					'class': 'th shrink center', 'data-key': 'checked'
 				})

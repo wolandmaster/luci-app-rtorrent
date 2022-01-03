@@ -1,4 +1,4 @@
-// Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
+// Copyright 2014-2022 Sandor Balazsi <sandor.balazsi@gmail.com>
 // This is free software, licensed under the Apache License, Version 2.0
 
 'use strict';
@@ -66,7 +66,7 @@ function decodeXmlRpc(xml) {
 		case 'string':
 			return xml.textContent;
 		case 'boolean':
-			return xml.textContent === 'true';
+			return xml.textContent !== '0';
 		case 'int':
 		case 'i4':
 		case 'i8':

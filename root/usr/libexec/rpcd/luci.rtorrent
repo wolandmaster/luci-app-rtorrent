@@ -1,71 +1,34 @@
 #!/usr/bin/env lua
--- Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
+-- Copyright 2014-2022 Sandor Balazsi <sandor.balazsi@gmail.com>
 -- This is free software, licensed under the Apache License, Version 2.0
 
-local fs = require "nixio.fs"
 local json = require "luci.jsonc"
-local socket = require "socket"
-
-local rtorrent_config_file = "/root/.rtorrent.rc"
+local rtorrent = require "rtorrent.xmlrpc"
 
 local methods = {
 	rtorrent_rpc = {
 		args = { xml = "xml" },
 		call = function(args)
-			local address, port = ("\n" .. tostring(fs.readfile(rtorrent_config_file)))
-				:match("\n%s*scgi_port%s*=%s*([^:]+):(%d+)")
-			if not address or not port then return { error = "No scgi port" }, 1 end
-
-			-- send request
-			local sock = socket.connect(address, port)
-			if not sock then return { error = "Socket connect failed" }, 1 end
-			local null = "\0"
-			local content_length = "CONTENT_LENGTH" .. null .. args.xml:len() .. null
-			local scgi_enable = "SCGI" .. null .. "1" .. null
-			local request_method = "REQUEST_METHOD" .. null .. "POST" .. null
-			local server_protocol = "SERVER_PROTOCOL" .. null .. "HTTP/1.1" .. null
-			local header = content_length .. scgi_enable .. request_method .. server_protocol
-			sock:send(header:len() .. ":" .. header .. "," .. args.xml)
-
-			-- receive answer
-			local headers = {}
-			local line, err = sock:receive()
-			if err then return { error = err }, 1 end
-			while line ~= "" do
-				local name, value = socket.skip(2, line:find("^(.-):%s*(.*)"))
-				if not name or not value then
-					return { error = "Malformed reponse header: " .. line }, 1
-				end
-				headers[name:lower()] = value
-				line, err = sock:receive()
-				if err then return { error = err }, 1 end
-			end
-			local body = sock:receive(headers["content-length"])
-			local code = socket.skip(2, headers.status:find("^(%d%d%d)"))
-			if tonumber(code) ~= 200 then return { error = "Wrong response code: " .. code }, 1 end
+			local body, err = rtorrent.send_xmlrpc_request(args.xml)
+			if not body then return { error = err }, 1 end
 			return { xml = body }
 		end
 	}
 }
 
 local function parse_input()
-	local parse = json.new()
-	local done, err
-
+	local parse, done, err = json.new()
 	while true do
 		local chunk = io.read(4096)
-		if not chunk then
-			break
+		if not chunk then break
 		elseif not done and not err then
 			done, err = parse:parse(chunk)
 		end
 	end
-
 	if not done then
 		print(json.stringify({ error = err or "Incomplete input" }))
 		os.exit(1)
 	end
-
 	return parse:get()
 end
 
@@ -75,30 +38,24 @@ local function validate_args(func, uargs)
 		print(json.stringify({ error = "Method not found" }))
 		os.exit(1)
 	end
-
 	if type(uargs) ~= "table" then
 		print(json.stringify({ error = "Invalid arguments" }))
 		os.exit(1)
 	end
-
 	uargs.ubus_rpc_session = nil
-
-	local k, v
 	local margs = method.args or {}
-	for k, v in pairs(uargs) do
-		if margs[k] == nil or (v ~= nil and type(v) ~= type(margs[k]))
-		then
+	for key, value in pairs(uargs) do
+		if margs[key] == nil or (value ~= nil and type(value) ~= type(margs[key])) then
 			print(json.stringify({ error = "Invalid arguments" }))
 			os.exit(1)
 		end
 	end
-
 	return method
 end
 
 if arg[1] == "list" then
-	local _, method, rv = nil, nil, {}
-	for _, method in pairs(methods) do rv[_] = method.args or {} end
+	local rv = {}
+	for name, method in pairs(methods) do rv[name] = method.args or {} end
 	print((json.stringify(rv):gsub(":%[%]", ":{}")))
 elseif arg[1] == "call" then
 	local args = parse_input()

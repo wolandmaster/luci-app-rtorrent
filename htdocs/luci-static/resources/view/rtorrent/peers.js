@@ -1,4 +1,4 @@
-// Copyright 2014-2021 Sandor Balazsi <sandor.balazsi@gmail.com>
+// Copyright 2014-2022 Sandor Balazsi <sandor.balazsi@gmail.com>
 // This is free software, licensed under the Apache License, Version 2.0
 
 'use strict';
